@@ -1,0 +1,16 @@
+# Node
+node_modules/
+.next/
+dist/
+build/
+
+# Flutter
+apps/mobile/.dart_tool/
+apps/mobile/build/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
+
+# Env
+.env
+.env.local
+.env*.local
