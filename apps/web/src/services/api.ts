@@ -1,49 +1,38 @@
 import axios from "axios";
 
-export const iamApi = axios.create({
-  baseURL: "/api/iam",
-});
+const TOKEN_KEY = "accessToken";
 
-export const projectsApi = axios.create({
-  baseURL: "/api/projects",
-});
+const getToken = () =>
+  typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
 
-export const discoveryApi = axios.create({
-  baseURL: "/api/discovery",
-});
+const createApi = (baseURL: string) => {
+  const api = axios.create({ baseURL });
 
-export const snapshotsApi = axios.create({
-  baseURL: "/api/snapshots",
-});
-
-export const auditApi = axios.create({
-  baseURL: "/api/audit",
-});
-
-export const adminDataApi = axios.create({
-  baseURL: "/api/admin-data",
-});
-
-// Injeta o JWT em todas as APIs
-[iamApi, projectsApi, discoveryApi, snapshotsApi, auditApi, adminDataApi].forEach((api) => {
   api.interceptors.request.use((config) => {
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("accessToken");
-      if (token) config.headers.Authorization = `Bearer ${token}`;
-    }
+    const token = getToken();
+    if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
   });
 
   api.interceptors.response.use(
-    (response) => response,
+    (res) => res,
     (error) => {
-      if (error.response?.status === 401) {
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("accessToken");
-          window.location.href = "/login";
-        }
+      if (error.response?.status === 401 && typeof window !== "undefined") {
+        localStorage.removeItem(TOKEN_KEY);
+        document.cookie = `${TOKEN_KEY}=; path=/; max-age=0`;
+        window.location.href = "/login";
       }
       return Promise.reject(error);
     }
   );
-});
+
+  return api;
+};
+
+export const iamApi = createApi("/api/iam");
+export const projectsApi = createApi("/api/projects");
+export const discoveryApi = createApi("/api/discovery");
+export const snapshotsApi = createApi("/api/snapshots");
+export const restoreApi = createApi("/api/restore");
+export const auditApi = createApi("/api/audit");
+export const adminDataApi = createApi("/api/admin-data");

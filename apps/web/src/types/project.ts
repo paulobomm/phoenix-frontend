@@ -1,15 +1,22 @@
 export interface Project {
   id: string;
   name: string;
-  description?: string;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
+  universeId: string;
+  status: "active" | "paused" | "archived";
+  ownerUserId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CreateProjectDto {
   name: string;
-  description?: string;
+  universeId: string;
+  apiKey: string;
+}
+
+export interface UpdateProjectDto {
+  name?: string;
+  status?: "active" | "paused" | "archived";
 }
 
 export interface PaginatedResponse<T> {
@@ -20,4 +27,11 @@ export interface PaginatedResponse<T> {
     currentPage: number;
     totalPages: number;
   };
+}
+
+export interface DataStore {
+  id: string;
+  name: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
 }
