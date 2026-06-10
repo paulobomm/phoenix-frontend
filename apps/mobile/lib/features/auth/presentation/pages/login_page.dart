@@ -76,7 +76,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
-                  colors: [AppColors.primary.withValues(alpha: 0.07), Colors.transparent],
+                  colors: [
+                    AppColors.primary.withValues(alpha: 0.07),
+                    Colors.transparent
+                  ],
                 ),
               ),
             ),
@@ -84,7 +87,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
-                padding: EdgeInsets.symmetric(horizontal: isWide ? 0 : 24, vertical: 32),
+                padding: EdgeInsets.symmetric(
+                    horizontal: isWide ? 0 : 24, vertical: 32),
                 child: SizedBox(
                   width: isWide ? 420 : double.infinity,
                   child: Form(
@@ -96,13 +100,17 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         const SizedBox(height: 32),
                         const Text(
                           'Sign in to your account',
-                          style: TextStyle(color: AppColors.text, fontSize: 22, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                              color: AppColors.text,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 6),
                         const Text(
                           'Gerencie seus Roblox DataStores com segurança',
-                          style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                          style: TextStyle(
+                              color: AppColors.textSecondary, fontSize: 13),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 32),
@@ -122,7 +130,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                 controller: _emailController,
                                 keyboardType: TextInputType.emailAddress,
                                 validator: (v) {
-                                  if (v == null || v.isEmpty) return 'Email obrigatório';
+                                  if (v == null || v.isEmpty)
+                                    return 'Email obrigatório';
                                   if (!v.contains('@')) return 'Email inválido';
                                   return null;
                                 },
@@ -135,15 +144,20 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                 obscureText: _obscurePassword,
                                 suffix: IconButton(
                                   icon: Icon(
-                                    _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                    _obscurePassword
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
                                     color: AppColors.textSecondary,
                                     size: 20,
                                   ),
-                                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                                  onPressed: () => setState(() =>
+                                      _obscurePassword = !_obscurePassword),
                                 ),
                                 validator: (v) {
-                                  if (v == null || v.isEmpty) return 'Senha obrigatória';
-                                  if (v.length < 6) return 'Mínimo 6 caracteres';
+                                  if (v == null || v.isEmpty)
+                                    return 'Senha obrigatória';
+                                  if (v.length < 6)
+                                    return 'Mínimo 6 caracteres';
                                   return null;
                                 },
                               ),
@@ -151,10 +165,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               Align(
                                 alignment: Alignment.centerRight,
                                 child: GestureDetector(
-                                  onTap: () => context.push('/auth/forgot-password'),
+                                  onTap: () =>
+                                      context.push('/auth/forgot-password'),
                                   child: const Text(
                                     'Esqueci minha senha',
-                                    style: TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.w500),
+                                    style: TextStyle(
+                                        color: AppColors.primary,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500),
                                   ),
                                 ),
                               ),
@@ -174,7 +192,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             Expanded(child: Divider(color: AppColors.border)),
                             Padding(
                               padding: EdgeInsets.symmetric(horizontal: 12),
-                              child: Text('ou', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                              child: Text('ou',
+                                  style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12)),
                             ),
                             Expanded(child: Divider(color: AppColors.border)),
                           ],
@@ -184,14 +205,18 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           width: double.infinity,
                           height: 48,
                           child: OutlinedButton.icon(
-                            onPressed: authState.isLoading ? null : _handleAuth0Login,
-                            icon: const Icon(Icons.lock_outline_rounded, size: 18),
+                            onPressed:
+                                authState.isLoading ? null : _handleAuth0Login,
+                            icon: const Icon(Icons.lock_outline_rounded,
+                                size: 18),
                             label: const Text('Continue with Auth0'),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.text,
                               side: const BorderSide(color: AppColors.border),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10)),
+                              textStyle: const TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w500),
                             ),
                           ),
                         ),
@@ -201,13 +226,17 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           children: [
                             const Text(
                               "Don't have an account? ",
-                              style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                              style: TextStyle(
+                                  color: AppColors.textSecondary, fontSize: 14),
                             ),
                             GestureDetector(
                               onTap: () => context.push('/auth/register'),
                               child: const Text(
                                 'Sign up',
-                                style: TextStyle(color: AppColors.primary, fontSize: 14, fontWeight: FontWeight.w600),
+                                style: TextStyle(
+                                    color: AppColors.primary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600),
                               ),
                             ),
                           ],
@@ -218,16 +247,20 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           decoration: BoxDecoration(
                             color: AppColors.primary.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                            border: Border.all(
+                                color:
+                                    AppColors.primary.withValues(alpha: 0.2)),
                           ),
                           child: const Row(
                             children: [
-                              Icon(Icons.info_outline, color: AppColors.primary, size: 16),
+                              Icon(Icons.info_outline,
+                                  color: AppColors.primary, size: 16),
                               SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  'Demo: use any email + password "password123"',
-                                  style: TextStyle(color: AppColors.primary, fontSize: 12),
+                                  'Use: admin@phoenix.gg / ChangeMe123!',
+                                  style: TextStyle(
+                                      color: AppColors.primary, fontSize: 12),
                                 ),
                               ),
                             ],

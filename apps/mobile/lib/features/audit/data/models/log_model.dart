@@ -31,4 +31,14 @@ class LogModel {
       receivedAt: DateTime.parse(json['receivedAt'] as String),
     );
   }
+
+  String get action => eventType;
+  String get details => routingKey;
+  DateTime get timestamp => occurredAt;
+
+  String get status {
+    if (eventType.contains('error') || eventType.contains('fail')) return 'error';
+    if (eventType.contains('warn')) return 'warning';
+    return 'success';
+  }
 }

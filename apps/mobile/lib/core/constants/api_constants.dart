@@ -8,6 +8,7 @@ abstract class ApiConstants {
   static const String discoveryBaseUrl = 'http://$_host:5003';
   static const String snapshotsBaseUrl = 'http://$_host:5004';
   static const String auditBaseUrl = 'http://$_host:5007';
+  static const String analyticsBaseUrl = 'http://$_host:5005';
 
   static const Duration connectTimeout = Duration(seconds: 10);
   static const Duration receiveTimeout = Duration(seconds: 30);
