@@ -19,6 +19,7 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
   int _currentStep = 0;
   final _nameCtrl = TextEditingController();
   final _universeIdCtrl = TextEditingController();
+  final _placeIdCtrl = TextEditingController(); // UI only
   final _apiKeyCtrl = TextEditingController();
   bool _obscureKey = true;
   bool _isFinishing = false;
@@ -27,6 +28,7 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
   void dispose() {
     _nameCtrl.dispose();
     _universeIdCtrl.dispose();
+    _placeIdCtrl.dispose();
     _apiKeyCtrl.dispose();
     super.dispose();
   }
@@ -48,7 +50,10 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro: $e'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating),
+        SnackBar(
+            content: Text('Erro: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating),
       );
     } finally {
       if (mounted) setState(() => _isFinishing = false);
@@ -99,7 +104,8 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Adicionar Jogo',
-                    style: TextStyle(color: AppColors.text, fontSize: 18, fontWeight: FontWeight.w700)),
+                    style:
+                        TextStyle(color: AppColors.text, fontSize: 18, fontWeight: FontWeight.w700)),
                 Text('Conecte seu jogo Roblox ao Phoenix',
                     style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
               ],
@@ -124,12 +130,14 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
             children: [
               Text(
                 'Etapa ${_currentStep + 1} de 3',
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                    color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w500),
               ),
               const Spacer(),
               Text(
                 ['Informações Básicas', 'API Key', 'Integração'][_currentStep],
-                style: const TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                    color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -165,13 +173,22 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
           controller: _universeIdCtrl,
           keyboardType: TextInputType.number,
         ),
+        const SizedBox(height: 16),
+        PhoenixTextField(
+          label: 'Place ID',
+          hint: 'Ex: 9283745',
+          controller: _placeIdCtrl,
+          keyboardType: TextInputType.number,
+        ),
         const SizedBox(height: 32),
         PhoenixButton(
           label: 'Próximo →',
           onPressed: () {
             if (_nameCtrl.text.trim().isEmpty || _universeIdCtrl.text.trim().isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Preencha todos os campos'), behavior: SnackBarBehavior.floating),
+                const SnackBar(
+                    content: Text('Preencha Nome e Universe ID'),
+                    behavior: SnackBarBehavior.floating),
               );
               return;
             }
@@ -199,10 +216,13 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Como obter sua API Key:',
-                  style: TextStyle(color: AppColors.text, fontSize: 13, fontWeight: FontWeight.w600)),
+                  style:
+                      TextStyle(color: AppColors.text, fontSize: 13, fontWeight: FontWeight.w600)),
               SizedBox(height: 8),
-              Text('1. Acesse o Roblox Creator Hub\n2. Vá em Credenciais → API Keys\n3. Crie com permissão de DataStore API',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12, height: 1.5)),
+              Text(
+                  '1. Acesse o Roblox Creator Hub\n2. Vá em Credenciais → API Keys\n3. Crie com permissão de DataStore API',
+                  style: TextStyle(
+                      color: AppColors.textSecondary, fontSize: 12, height: 1.5)),
             ],
           ),
         ),
@@ -232,7 +252,9 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
           onPressed: () {
             if (_apiKeyCtrl.text.trim().isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Informe a API Key'), behavior: SnackBarBehavior.floating),
+                const SnackBar(
+                    content: Text('Informe a API Key'),
+                    behavior: SnackBarBehavior.floating),
               );
               return;
             }
@@ -250,7 +272,8 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
   }
 
   Widget _buildStep3() {
-    const luaCode = '''local DataStoreService = game:GetService("DataStoreService")
+    const luaCode =
+        '''local DataStoreService = game:GetService("DataStoreService")
 local HttpService = game:GetService("HttpService")
 
 -- Phoenix DataStore Hook
@@ -265,7 +288,8 @@ end''';
         const Text('Integração com Luau',
             style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.w700)),
         const SizedBox(height: 4),
-        const Text('Adicione este código ao seu jogo para monitoramento em tempo real',
+        const Text(
+            'Adicione este código ao seu jogo para monitoramento em tempo real',
             style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
         const SizedBox(height: 16),
         Container(
@@ -281,19 +305,27 @@ end''';
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Script Luau', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                  const Text('Script Luau',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
                   GestureDetector(
                     onTap: () {
                       Clipboard.setData(const ClipboardData(text: luaCode));
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Código copiado!'), duration: Duration(seconds: 1), behavior: SnackBarBehavior.floating),
+                        const SnackBar(
+                            content: Text('Código copiado!'),
+                            duration: Duration(seconds: 1),
+                            behavior: SnackBarBehavior.floating),
                       );
                     },
                     child: const Row(
                       children: [
                         Icon(Icons.copy_rounded, color: AppColors.primary, size: 14),
                         SizedBox(width: 4),
-                        Text('Copiar', style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600)),
+                        Text('Copiar',
+                            style: TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),
@@ -302,7 +334,11 @@ end''';
               const SizedBox(height: 10),
               const Text(
                 luaCode,
-                style: TextStyle(color: AppColors.text, fontSize: 11, fontFamily: 'monospace', height: 1.5),
+                style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 11,
+                    fontFamily: 'monospace',
+                    height: 1.5),
               ),
             ],
           ),
