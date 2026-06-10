@@ -7,14 +7,28 @@ class AuditRepository {
 
   AuditRepository(this._apiClient);
 
-  Future<List<LogModel>> getLogs(String? gameId) async {
+  Future<List<LogModel>> getLogs(
+    String? projectId, {
+    String? eventType,
+    DateTime? from,
+    DateTime? to,
+    int page = 1,
+    int limit = 20,
+  }) async {
     try {
-      final res = await _apiClient.dio.get('/v1/logs', queryParameters: {
-        if (gameId != null) 'gameId': gameId,
+      final res = await _apiClient.auditDio.get('/v1/audit', queryParameters: {
+        if (projectId != null) 'project_id': projectId,
+        if (eventType != null) 'type': eventType,
+        if (from != null) 'from': from.toIso8601String(),
+        if (to != null) 'to': to.toIso8601String(),
+        '_page': page,
+        '_size': limit,
       });
       final data = res.data;
       final list = data is Map ? (data['data'] as List? ?? []) : (data as List);
-      return list.map((e) => LogModel.fromJson(e as Map<String, dynamic>)).toList();
+      return list
+          .map((e) => LogModel.fromJson(e as Map<String, dynamic>))
+          .toList();
     } on DioException catch (e) {
       throw Exception(_parseError(e));
     }
