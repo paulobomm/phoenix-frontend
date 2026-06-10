@@ -1,51 +1,68 @@
 class SnapshotModel {
   final String id;
-  final String name;
+  final String projectId;
+  final String? scheduleId;
   final String status;
-  final int keyCount;
-  final int sizeBytes;
-  final int durationMs;
+  final DateTime? startedAt;
+  final DateTime? completedAt;
+  final String? error;
   final DateTime createdAt;
-  final String gameId;
-  final String? datastoreId;
 
   const SnapshotModel({
     required this.id,
-    required this.name,
+    required this.projectId,
+    this.scheduleId,
     required this.status,
-    required this.keyCount,
-    required this.sizeBytes,
-    required this.durationMs,
+    this.startedAt,
+    this.completedAt,
+    this.error,
     required this.createdAt,
-    this.gameId = '',
-    this.datastoreId,
   });
 
   factory SnapshotModel.fromJson(Map<String, dynamic> json) {
     return SnapshotModel(
       id: json['id'] as String,
-      name: json['name'] as String? ?? 'Snapshot',
+      projectId: json['projectId'] as String? ?? '',
+      scheduleId: json['scheduleId'] as String?,
       status: json['status'] as String? ?? 'pending',
-      keyCount: json['keyCount'] as int? ?? 0,
-      sizeBytes: (json['sizeBytes'] as num?)?.toInt() ?? 0,
-      durationMs: json['durationMs'] as int? ?? 0,
+      startedAt: json['startedAt'] != null
+          ? DateTime.tryParse(json['startedAt'] as String)
+          : null,
+      completedAt: json['completedAt'] != null
+          ? DateTime.tryParse(json['completedAt'] as String)
+          : null,
+      error: json['error'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
-      gameId: json['gameId'] as String? ?? '',
-      datastoreId: json['datastoreId'] as String?,
     );
   }
 
-  String get formattedSize {
-    if (sizeBytes < 1024) return '$sizeBytes B';
-    if (sizeBytes < 1024 * 1024) return '${(sizeBytes / 1024).toStringAsFixed(1)} KB';
-    if (sizeBytes < 1024 * 1024 * 1024) {
-      return '${(sizeBytes / (1024 * 1024)).toStringAsFixed(2)} MB';
-    }
-    return '${(sizeBytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
-  }
+  bool get isCompleted => status == 'completed';
+  bool get isFailed => status == 'failed';
+  bool get isRunning => status == 'running';
+}
 
-  String get formattedDuration {
-    if (durationMs < 1000) return '${durationMs}ms';
-    return '${(durationMs / 1000).toStringAsFixed(1)}s';
+class SnapshotScheduleModel {
+  final String id;
+  final String projectId;
+  final String cronExpr;
+  final bool enabled;
+  final DateTime createdAt;
+
+  const SnapshotScheduleModel({
+    required this.id,
+    required this.projectId,
+    required this.cronExpr,
+    required this.enabled,
+    required this.createdAt,
+  });
+
+  factory SnapshotScheduleModel.fromJson(Map<String, dynamic> json) {
+    return SnapshotScheduleModel(
+      id: json['id'] as String,
+      projectId: json['projectId'] as String? ?? '',
+      cronExpr: json['cronExpr'] as String? ?? '',
+      enabled: json['enabled'] as bool? ?? true,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+    );
   }
 }

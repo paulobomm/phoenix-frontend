@@ -2,12 +2,44 @@ import 'package:dio/dio.dart';
 import '../constants/api_constants.dart';
 
 class ApiClient {
-  late final Dio _dio;
+  late final Dio _iamDio;
+  late final Dio _projectsDio;
+  late final Dio _discoveryDio;
+  late final Dio _snapshotsDio;
+  late final Dio _auditDio;
 
   ApiClient() {
-    _dio = Dio(
+    _iamDio = _buildDio(ApiConstants.iamBaseUrl);
+    _projectsDio = _buildDio(ApiConstants.projectsBaseUrl);
+    _discoveryDio = _buildDio(ApiConstants.discoveryBaseUrl);
+    _snapshotsDio = _buildDio(ApiConstants.snapshotsBaseUrl);
+    _auditDio = _buildDio(ApiConstants.auditBaseUrl);
+  }
+
+  Dio get iamDio => _iamDio;
+  Dio get projectsDio => _projectsDio;
+  Dio get discoveryDio => _discoveryDio;
+  Dio get snapshotsDio => _snapshotsDio;
+  Dio get auditDio => _auditDio;
+
+  void setAuthToken(String token) {
+    for (final dio in _allDios) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    }
+  }
+
+  void clearAuthToken() {
+    for (final dio in _allDios) {
+      dio.options.headers.remove('Authorization');
+    }
+  }
+
+  List<Dio> get _allDios => [_iamDio, _projectsDio, _discoveryDio, _snapshotsDio, _auditDio];
+
+  Dio _buildDio(String baseUrl) {
+    return Dio(
       BaseOptions(
-        baseUrl: ApiConstants.baseUrl,
+        baseUrl: baseUrl,
         connectTimeout: ApiConstants.connectTimeout,
         receiveTimeout: ApiConstants.receiveTimeout,
         headers: {
@@ -16,15 +48,5 @@ class ApiClient {
         },
       ),
     );
-  }
-
-  Dio get dio => _dio;
-
-  void setAuthToken(String token) {
-    _dio.options.headers['Authorization'] = 'Bearer $token';
-  }
-
-  void clearAuthToken() {
-    _dio.options.headers.remove('Authorization');
   }
 }

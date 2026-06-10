@@ -53,8 +53,8 @@ class GameDetailPage extends ConsumerWidget {
             title: Text(game.name),
             actions: [
               PhoenixBadge(
-                label: game.isSyncPaused ? 'Pausado' : 'Ativo',
-                status: game.isSyncPaused ? BadgeStatus.warning : BadgeStatus.success,
+                label: game.isActive ? 'Ativo' : game.status,
+                status: game.isActive ? BadgeStatus.success : BadgeStatus.warning,
               ),
               const SizedBox(width: 16),
             ],
@@ -85,10 +85,12 @@ class GameDetailPage extends ConsumerWidget {
                     Text(game.name, style: const TextStyle(color: AppColors.text, fontSize: 20, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 16),
                     _DetailRow(label: 'Universe ID', value: game.universeId),
-                    _DetailRow(label: 'Place ID', value: game.placeId),
-                    _DetailRow(label: 'DataStores', value: '${game.datastoreCount}'),
-                    _DetailRow(label: 'Intervalo de Sync', value: '${game.syncInterval} minutos'),
-                    _DetailRow(label: 'Status', value: game.isSyncPaused ? 'Pausado' : 'Ativo'),
+                    _DetailRow(label: 'Status', value: game.isActive ? 'Ativo' : game.status),
+                    if (game.createdAt != null)
+                      _DetailRow(
+                        label: 'Conectado em',
+                        value: '${game.createdAt!.day.toString().padLeft(2, '0')}/${game.createdAt!.month.toString().padLeft(2, '0')}/${game.createdAt!.year}',
+                      ),
                   ],
                 ),
               ),
@@ -101,14 +103,14 @@ class GameDetailPage extends ConsumerWidget {
                 description: 'Criar um backup agora',
                 color: AppColors.primary,
                 onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Backup iniciado!'), backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating),
+                  const SnackBar(content: Text('Em breve!'), backgroundColor: AppColors.card, behavior: SnackBarBehavior.floating),
                 ),
               ),
               const SizedBox(height: 8),
               _QuickAction(
                 icon: Icons.storage_outlined,
                 label: 'Ver DataStores',
-                description: '${game.datastoreCount} datastores disponíveis',
+                description: 'Navegar pelos DataStores',
                 color: const Color(0xFF60A5FA),
                 onTap: () => context.go('/datastores'),
               ),

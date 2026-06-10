@@ -1,37 +1,34 @@
 class LogModel {
   final String id;
-  final String action;
-  final String status;
-  final String details;
-  final DateTime timestamp;
-  final String? gameId;
+  final DateTime occurredAt;
+  final String exchange;
+  final String routingKey;
+  final String eventType;
+  final String? projectId;
+  final dynamic payload;
+  final DateTime receivedAt;
 
   const LogModel({
     required this.id,
-    required this.action,
-    required this.status,
-    required this.details,
-    required this.timestamp,
-    this.gameId,
+    required this.occurredAt,
+    required this.exchange,
+    required this.routingKey,
+    required this.eventType,
+    this.projectId,
+    this.payload,
+    required this.receivedAt,
   });
 
   factory LogModel.fromJson(Map<String, dynamic> json) {
     return LogModel(
       id: json['id'] as String,
-      action: json['action'] as String? ?? '',
-      status: json['status'] as String? ?? 'success',
-      details: _parseDetails(json['details']),
-      timestamp: DateTime.parse(json['createdAt'] as String),
-      gameId: json['gameId'] as String?,
+      occurredAt: DateTime.parse(json['occurredAt'] as String),
+      exchange: json['exchange'] as String? ?? '',
+      routingKey: json['routingKey'] as String? ?? '',
+      eventType: json['eventType'] as String? ?? '',
+      projectId: json['projectId'] as String?,
+      payload: json['payload'],
+      receivedAt: DateTime.parse(json['receivedAt'] as String),
     );
-  }
-
-  static String _parseDetails(dynamic details) {
-    if (details == null) return '';
-    if (details is String) return details;
-    if (details is Map) {
-      return details.entries.map((e) => '${e.key}: ${e.value}').join(', ');
-    }
-    return details.toString();
   }
 }
