@@ -1,26 +1,49 @@
 import axios from "axios";
 
 export const iamApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_IAM_URL,
+  baseURL: "/api/iam",
 });
 
-iamApi.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("accessToken");
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
+export const projectsApi = axios.create({
+  baseURL: "/api/projects",
 });
 
-iamApi.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("accessToken");
-        window.location.href = "/login";
-      }
+export const discoveryApi = axios.create({
+  baseURL: "/api/discovery",
+});
+
+export const snapshotsApi = axios.create({
+  baseURL: "/api/snapshots",
+});
+
+export const auditApi = axios.create({
+  baseURL: "/api/audit",
+});
+
+export const adminDataApi = axios.create({
+  baseURL: "/api/admin-data",
+});
+
+// Injeta o JWT em todas as APIs
+[iamApi, projectsApi, discoveryApi, snapshotsApi, auditApi, adminDataApi].forEach((api) => {
+  api.interceptors.request.use((config) => {
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("accessToken");
+      if (token) config.headers.Authorization = `Bearer ${token}`;
     }
-    return Promise.reject(error);
-  }
-);
+    return config;
+  });
+
+  api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      if (error.response?.status === 401) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("accessToken");
+          window.location.href = "/login";
+        }
+      }
+      return Promise.reject(error);
+    }
+  );
+});
