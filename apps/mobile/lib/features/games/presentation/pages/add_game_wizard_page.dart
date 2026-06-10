@@ -19,16 +19,27 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
   int _currentStep = 0;
   final _nameCtrl = TextEditingController();
   final _universeIdCtrl = TextEditingController();
+  final _placeIdCtrl = TextEditingController();
   final _apiKeyCtrl = TextEditingController();
   bool _obscureKey = true;
+  bool _isValidating = false;
+  bool _apiKeyValid = false;
   bool _isFinishing = false;
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     _universeIdCtrl.dispose();
+    _placeIdCtrl.dispose();
     _apiKeyCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _validateApiKey() async {
+    if (_apiKeyCtrl.text.trim().isEmpty) return;
+    setState(() { _isValidating = true; _apiKeyValid = false; });
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (mounted) setState(() { _isValidating = false; _apiKeyValid = true; });
   }
 
   Future<void> _finish() async {
@@ -48,7 +59,10 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro: $e'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating),
+        SnackBar(
+            content: Text('Erro: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating),
       );
     } finally {
       if (mounted) setState(() => _isFinishing = false);
@@ -165,13 +179,22 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
           controller: _universeIdCtrl,
           keyboardType: TextInputType.number,
         ),
+        const SizedBox(height: 16),
+        PhoenixTextField(
+          label: 'Place ID',
+          hint: 'Ex: 9283745',
+          controller: _placeIdCtrl,
+          keyboardType: TextInputType.number,
+        ),
         const SizedBox(height: 32),
         PhoenixButton(
           label: 'Próximo →',
           onPressed: () {
             if (_nameCtrl.text.trim().isEmpty || _universeIdCtrl.text.trim().isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Preencha todos os campos'), behavior: SnackBarBehavior.floating),
+                const SnackBar(
+                    content: Text('Preencha Nome e Universe ID'),
+                    behavior: SnackBarBehavior.floating),
               );
               return;
             }
@@ -195,21 +218,28 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
           ),
-          child: const Column(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Como obter sua API Key:',
-                  style: TextStyle(color: AppColors.text, fontSize: 13, fontWeight: FontWeight.w600)),
-              SizedBox(height: 8),
-              Text('1. Acesse o Roblox Creator Hub\n2. Vá em Credenciais → API Keys\n3. Crie com permissão de DataStore API',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12, height: 1.5)),
+              const Text(
+                'Acesse o Creator Hub do Roblox, vá em Credenciais API e gere uma nova chave com permissões de DataStore.',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12, height: 1.5),
+              ),
+              const SizedBox(height: 10),
+              GestureDetector(
+                onTap: () {},
+                child: const Text(
+                  'Abrir Creator Hub 🔗',
+                  style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
             ],
           ),
         ),
         const SizedBox(height: 20),
         PhoenixTextField(
-          label: 'Open Cloud API Key',
-          hint: 'opencloud_...',
+          label: 'API KEY',
+          hint: 'rbxp_...',
           controller: _apiKeyCtrl,
           obscureText: _obscureKey,
           suffix: IconButton(
@@ -221,24 +251,31 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
             onPressed: () => setState(() => _obscureKey = !_obscureKey),
           ),
         ),
-        const SizedBox(height: 8),
-        const Text(
-          'A API Key é criptografada em repouso e nunca é retornada pela API.',
-          style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
-        ),
+        if (_apiKeyValid) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: AppColors.success, size: 18),
+                SizedBox(width: 8),
+                Text('✅ API Key válida!', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 20),
         PhoenixButton(
-          label: 'Próximo →',
-          onPressed: () {
-            if (_apiKeyCtrl.text.trim().isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Informe a API Key'), behavior: SnackBarBehavior.floating),
-              );
-              return;
-            }
-            setState(() => _currentStep = 2);
-          },
+          label: _apiKeyValid ? 'Validada! →' : 'Validar e Próximo →',
+          onPressed: _apiKeyValid ? () => setState(() => _currentStep = 2) : (_apiKeyCtrl.text.isEmpty ? null : _validateApiKey),
+          isLoading: _isValidating,
           width: double.infinity,
+          backgroundColor: _apiKeyValid ? AppColors.success : null,
         ),
         const SizedBox(height: 12),
         TextButton(

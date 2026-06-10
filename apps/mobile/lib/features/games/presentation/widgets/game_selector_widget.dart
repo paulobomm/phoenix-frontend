@@ -60,15 +60,15 @@ class GameSelectorWidget extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               decoration: BoxDecoration(
-                color: selectedGame?.isSyncPaused == true
-                    ? AppColors.warning.withValues(alpha: 0.15)
-                    : AppColors.success.withValues(alpha: 0.15),
+                color: selectedGame?.isActive == true
+                    ? AppColors.success.withValues(alpha: 0.15)
+                    : AppColors.warning.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                selectedGame?.isSyncPaused == true ? 'Pausado' : 'Ativo',
+                selectedGame?.isActive == true ? 'Ativo' : 'Pausado',
                 style: TextStyle(
-                  color: selectedGame?.isSyncPaused == true ? AppColors.warning : AppColors.success,
+                  color: selectedGame?.isActive == true ? AppColors.success : AppColors.warning,
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                 ),
@@ -171,20 +171,22 @@ class _GameSelectorSheet extends ConsumerWidget {
                             ),
                           ),
                           Text(
-                            '${game.datastoreCount} datastores • ${game.syncInterval}min sync',
+                            'Universe ID: ${game.universeId}',
                             style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                           ),
                         ],
                       ),
                     ),
-                    if (game.isSyncPaused)
+                    if (!game.isActive)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: AppColors.warning.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Text('Pausado', style: TextStyle(color: AppColors.warning, fontSize: 10, fontWeight: FontWeight.w600)),
+                        child: const Text('Pausado',
+                            style: TextStyle(
+                                color: AppColors.warning, fontSize: 10, fontWeight: FontWeight.w600)),
                       )
                     else if (isSelected)
                       const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 20),

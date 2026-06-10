@@ -55,7 +55,8 @@ class GameCard extends ConsumerWidget {
                           Expanded(
                             child: Text(
                               game.name,
-                              style: const TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w700),
+                              style: const TextStyle(
+                                  color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w700),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -67,6 +68,8 @@ class GameCard extends ConsumerWidget {
                       Row(
                         children: [
                           _InfoChip(Icons.tag_rounded, 'ID: ${game.universeId}'),
+                          const SizedBox(width: 10),
+                          _InfoChip(Icons.storage_rounded, '0 DataStores'),
                         ],
                       ),
                     ],
@@ -79,6 +82,16 @@ class GameCard extends ConsumerWidget {
                     Text(
                       _formatTime(game.updatedAt),
                       style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      '0 snapshots',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      '— MB',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
                     ),
                   ],
                 ),
@@ -183,7 +196,7 @@ class _StatusBadge extends StatelessWidget {
         ),
       ),
       child: Text(
-        active ? 'Ativo' : 'Inativo',
+        active ? 'Ativo' : 'Pausado',
         style: TextStyle(
           color: active ? AppColors.success : AppColors.warning,
           fontSize: 11,
@@ -232,7 +245,10 @@ class _ActionButton extends StatelessWidget {
             color: filled ? AppColors.primary : AppColors.border,
           ),
           boxShadow: filled
-              ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.2), blurRadius: 6, offset: const Offset(0, 2))]
+              ? [BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.2),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2))]
               : null,
         ),
         child: Text(
