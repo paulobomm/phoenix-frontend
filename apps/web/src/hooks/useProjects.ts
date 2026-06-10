@@ -33,9 +33,7 @@ export function useProjects() {
     setProjects((prev) => prev.filter((p) => p.id !== id));
   };
 
-  useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
+  useEffect(() => { fetchProjects(); }, [fetchProjects]);
 
   return { projects, loading, error, createProject, deleteProject, refetch: fetchProjects };
 }

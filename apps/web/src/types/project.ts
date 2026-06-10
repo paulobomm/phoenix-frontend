@@ -22,3 +22,10 @@ export interface PaginatedResponse<T> {
     totalPages: number;
   };
 }
+
+export interface DataStore {
+  id: string;
+  name: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+}
