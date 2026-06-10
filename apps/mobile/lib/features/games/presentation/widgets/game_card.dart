@@ -60,15 +60,13 @@ class GameCard extends ConsumerWidget {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          _StatusBadge(active: !game.isSyncPaused),
+                          _StatusBadge(active: game.isActive),
                         ],
                       ),
                       const SizedBox(height: 6),
                       Row(
                         children: [
                           _InfoChip(Icons.tag_rounded, 'ID: ${game.universeId}'),
-                          const SizedBox(width: 12),
-                          _InfoChip(Icons.storage_outlined, '${game.datastoreCount} DataStores'),
                         ],
                       ),
                     ],
@@ -79,18 +77,8 @@ class GameCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      _formatTime(game.lastSync),
+                      _formatTime(game.updatedAt),
                       style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      '24 snapshots',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      '8.5 MB',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
                     ),
                   ],
                 ),
@@ -195,7 +183,7 @@ class _StatusBadge extends StatelessWidget {
         ),
       ),
       child: Text(
-        active ? 'Ativo' : 'Pausado',
+        active ? 'Ativo' : 'Inativo',
         style: TextStyle(
           color: active ? AppColors.success : AppColors.warning,
           fontSize: 11,

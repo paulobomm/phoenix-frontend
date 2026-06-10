@@ -28,9 +28,9 @@ class GamesNotifier extends StateNotifier<AsyncValue<List<GameModel>>> {
     }
   }
 
-  Future<void> addGame(String universeId, String placeId, String name, String apiKey, int syncInterval) async {
+  Future<void> addGame(String name, String universeId, String apiKey) async {
     try {
-      final newGame = await _repository.addGame(universeId, placeId, name, apiKey, syncInterval);
+      final newGame = await _repository.addGame(name, universeId, apiKey);
       final current = state.valueOrNull ?? [];
       state = AsyncData([...current, newGame]);
     } catch (e, st) {
@@ -42,11 +42,5 @@ class GamesNotifier extends StateNotifier<AsyncValue<List<GameModel>>> {
     await _repository.deleteGame(id);
     final current = state.valueOrNull ?? [];
     state = AsyncData(current.where((g) => g.id != id).toList());
-  }
-
-  Future<void> toggleSync(String id, bool pause) async {
-    final updated = await _repository.toggleSync(id, pause);
-    final current = state.valueOrNull ?? [];
-    state = AsyncData(current.map((g) => g.id == id ? updated : g).toList());
   }
 }
