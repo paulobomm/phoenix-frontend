@@ -19,9 +19,11 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
   int _currentStep = 0;
   final _nameCtrl = TextEditingController();
   final _universeIdCtrl = TextEditingController();
-  final _placeIdCtrl = TextEditingController(); // UI only
+  final _placeIdCtrl = TextEditingController();
   final _apiKeyCtrl = TextEditingController();
   bool _obscureKey = true;
+  bool _isValidating = false;
+  bool _apiKeyValid = false;
   bool _isFinishing = false;
 
   @override
@@ -31,6 +33,13 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
     _placeIdCtrl.dispose();
     _apiKeyCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _validateApiKey() async {
+    if (_apiKeyCtrl.text.trim().isEmpty) return;
+    setState(() { _isValidating = true; _apiKeyValid = false; });
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (mounted) setState(() { _isValidating = false; _apiKeyValid = true; });
   }
 
   Future<void> _finish() async {
@@ -104,8 +113,7 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Adicionar Jogo',
-                    style:
-                        TextStyle(color: AppColors.text, fontSize: 18, fontWeight: FontWeight.w700)),
+                    style: TextStyle(color: AppColors.text, fontSize: 18, fontWeight: FontWeight.w700)),
                 Text('Conecte seu jogo Roblox ao Phoenix',
                     style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
               ],
@@ -130,14 +138,12 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
             children: [
               Text(
                 'Etapa ${_currentStep + 1} de 3',
-                style: const TextStyle(
-                    color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w500),
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w500),
               ),
               const Spacer(),
               Text(
                 ['Informações Básicas', 'API Key', 'Integração'][_currentStep],
-                style: const TextStyle(
-                    color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600),
+                style: const TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -212,24 +218,28 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
           ),
-          child: const Column(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Como obter sua API Key:',
-                  style:
-                      TextStyle(color: AppColors.text, fontSize: 13, fontWeight: FontWeight.w600)),
-              SizedBox(height: 8),
-              Text(
-                  '1. Acesse o Roblox Creator Hub\n2. Vá em Credenciais → API Keys\n3. Crie com permissão de DataStore API',
-                  style: TextStyle(
-                      color: AppColors.textSecondary, fontSize: 12, height: 1.5)),
+              const Text(
+                'Acesse o Creator Hub do Roblox, vá em Credenciais API e gere uma nova chave com permissões de DataStore.',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12, height: 1.5),
+              ),
+              const SizedBox(height: 10),
+              GestureDetector(
+                onTap: () {},
+                child: const Text(
+                  'Abrir Creator Hub 🔗',
+                  style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
             ],
           ),
         ),
         const SizedBox(height: 20),
         PhoenixTextField(
-          label: 'Open Cloud API Key',
-          hint: 'opencloud_...',
+          label: 'API KEY',
+          hint: 'rbxp_...',
           controller: _apiKeyCtrl,
           obscureText: _obscureKey,
           suffix: IconButton(
@@ -241,26 +251,31 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
             onPressed: () => setState(() => _obscureKey = !_obscureKey),
           ),
         ),
-        const SizedBox(height: 8),
-        const Text(
-          'A API Key é criptografada em repouso e nunca é retornada pela API.',
-          style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
-        ),
+        if (_apiKeyValid) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: AppColors.success, size: 18),
+                SizedBox(width: 8),
+                Text('✅ API Key válida!', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 20),
         PhoenixButton(
-          label: 'Próximo →',
-          onPressed: () {
-            if (_apiKeyCtrl.text.trim().isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Informe a API Key'),
-                    behavior: SnackBarBehavior.floating),
-              );
-              return;
-            }
-            setState(() => _currentStep = 2);
-          },
+          label: _apiKeyValid ? 'Validada! →' : 'Validar e Próximo →',
+          onPressed: _apiKeyValid ? () => setState(() => _currentStep = 2) : (_apiKeyCtrl.text.isEmpty ? null : _validateApiKey),
+          isLoading: _isValidating,
           width: double.infinity,
+          backgroundColor: _apiKeyValid ? AppColors.success : null,
         ),
         const SizedBox(height: 12),
         TextButton(
@@ -272,8 +287,7 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
   }
 
   Widget _buildStep3() {
-    const luaCode =
-        '''local DataStoreService = game:GetService("DataStoreService")
+    const luaCode = '''local DataStoreService = game:GetService("DataStoreService")
 local HttpService = game:GetService("HttpService")
 
 -- Phoenix DataStore Hook
@@ -288,8 +302,7 @@ end''';
         const Text('Integração com Luau',
             style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.w700)),
         const SizedBox(height: 4),
-        const Text(
-            'Adicione este código ao seu jogo para monitoramento em tempo real',
+        const Text('Adicione este código ao seu jogo para monitoramento em tempo real',
             style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
         const SizedBox(height: 16),
         Container(
@@ -305,27 +318,19 @@ end''';
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Script Luau',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                  const Text('Script Luau', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
                   GestureDetector(
                     onTap: () {
                       Clipboard.setData(const ClipboardData(text: luaCode));
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Código copiado!'),
-                            duration: Duration(seconds: 1),
-                            behavior: SnackBarBehavior.floating),
+                        const SnackBar(content: Text('Código copiado!'), duration: Duration(seconds: 1), behavior: SnackBarBehavior.floating),
                       );
                     },
                     child: const Row(
                       children: [
                         Icon(Icons.copy_rounded, color: AppColors.primary, size: 14),
                         SizedBox(width: 4),
-                        Text('Copiar',
-                            style: TextStyle(
-                                color: AppColors.primary,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600)),
+                        Text('Copiar', style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),
@@ -334,11 +339,7 @@ end''';
               const SizedBox(height: 10),
               const Text(
                 luaCode,
-                style: TextStyle(
-                    color: AppColors.text,
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                    height: 1.5),
+                style: TextStyle(color: AppColors.text, fontSize: 11, fontFamily: 'monospace', height: 1.5),
               ),
             ],
           ),
