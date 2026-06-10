@@ -1,0 +1,23 @@
+:root {
+  --phoenix-bg: #0A0A0A;
+  --phoenix-card: #141414;
+  --phoenix-border: #242424;
+  --phoenix-text: #F5F5F5;
+  --phoenix-text-secondary: #6B6B6B;
+  --phoenix-primary: #FF6B00;
+  --phoenix-primary-hover: #E55F00;
+  --phoenix-success: #22C55E;
+  --phoenix-error: #EF4444;
+  --phoenix-warning: #F59E0B;
+  --phoenix-blue: #60A5FA;
+}
+
+/* Corrigir autocomplete amarelo do browser */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #141414 inset !important;
+  -webkit-text-fill-color: #F5F5F5 !important;
+  caret-color: #F5F5F5;
+}

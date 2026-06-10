@@ -1,21 +1,22 @@
 "use client";
 
-import { authService } from "@/services/auth.service";
-
 export default function DashboardPage() {
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <button
-            onClick={() => authService.logout()}
-            className="text-sm text-gray-400 hover:text-white transition-colors"
-          >
-            Sair
-          </button>
+    <div>
+      <h2 className="text-xl font-semibold text-white mb-6">Visão Geral</h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-gray-800 rounded-xl p-6">
+          <p className="text-gray-400 text-sm">Projetos</p>
+          <p className="text-3xl font-bold text-white mt-1">—</p>
         </div>
-        <p className="text-gray-400">Bem-vindo ao Phoenix! ✨</p>
+        <div className="bg-gray-800 rounded-xl p-6">
+          <p className="text-gray-400 text-sm">Snapshots</p>
+          <p className="text-3xl font-bold text-white mt-1">—</p>
+        </div>
+        <div className="bg-gray-800 rounded-xl p-6">
+          <p className="text-gray-400 text-sm">Auditoria</p>
+          <p className="text-3xl font-bold text-white mt-1">—</p>
+        </div>
       </div>
     </div>
   );
