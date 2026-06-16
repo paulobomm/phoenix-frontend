@@ -28,8 +28,8 @@ class GameCard extends ConsumerWidget {
 
     final datastoreLabel = datastoreCountAsync.when(
       data: (n) => '$n DataStore${n == 1 ? '' : 's'}',
-      loading: () => '... DataStores',
-      error: (_, __) => '0 DataStores',
+      loading: () => '...',
+      error: (_, __) => '0 DS',
     );
 
     final snapshotLabel = snapshotCountAsync.when(
@@ -83,9 +83,13 @@ class GameCard extends ConsumerWidget {
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          _InfoChip(Icons.tag_rounded, 'ID: ${game.universeId}'),
+                          Flexible(
+                            child: _InfoChip(Icons.tag_rounded, 'ID: ${game.universeId}'),
+                          ),
                           const SizedBox(width: 10),
-                          _InfoChip(Icons.storage_rounded, datastoreLabel),
+                          Flexible(
+                            child: _InfoChip(Icons.storage_rounded, datastoreLabel),
+                          ),
                         ],
                       ),
                     ],
@@ -232,7 +236,13 @@ class _InfoChip extends StatelessWidget {
       children: [
         Icon(icon, size: 12, color: AppColors.textSecondary),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+        Flexible(
+          child: Text(
+            label,
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ],
     );
   }
