@@ -16,8 +16,16 @@ final datastoresProvider =
   return repo.getDataStores(selectedGame?.id ?? '');
 });
 
+// Per-project datastore count — used by game cards
+final datastoreCountProvider =
+    FutureProvider.autoDispose.family<int, String>((ref, projectId) async {
+  if (projectId.isEmpty) return 0;
+  final repo = ref.read(datastoresRepositoryProvider);
+  final list = await repo.getDataStores(projectId);
+  return list.length;
+});
+
 final entriesProvider =
     FutureProvider.autoDispose.family<List<EntryModel>, String>((ref, datastoreId) async {
-  // Entries are not exposed by the discovery API — return empty list.
   return [];
 });

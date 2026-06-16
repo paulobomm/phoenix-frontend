@@ -15,6 +15,15 @@ final snapshotsProvider =
   return repo.getSnapshots(selectedGame?.id ?? '');
 });
 
+// Per-project snapshot count — used by game cards
+final snapshotCountProvider =
+    FutureProvider.autoDispose.family<int, String>((ref, projectId) async {
+  if (projectId.isEmpty) return 0;
+  final repo = ref.read(snapshotsRepositoryProvider);
+  final list = await repo.getSnapshots(projectId);
+  return list.length;
+});
+
 final snapshotDetailProvider =
     FutureProvider.autoDispose.family<SnapshotModel?, String>((ref, id) async {
   final repo = ref.read(snapshotsRepositoryProvider);

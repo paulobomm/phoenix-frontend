@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/models/game_model.dart';
 import '../../domain/games_provider.dart';
+import '../../../datastores/domain/datastores_provider.dart';
+import '../../../snapshots/domain/snapshots_provider.dart';
 
 class GameCard extends ConsumerWidget {
   final GameModel game;
@@ -14,13 +16,28 @@ class GameCard extends ConsumerWidget {
   String _formatTime(DateTime? dt) {
     if (dt == null) return 'Nunca';
     final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 60) return '${diff.inMinutes}min atrás';
-    if (diff.inHours < 24) return '${diff.inHours}h atrás';
-    return '${diff.inDays}d atrás';
+    if (diff.inMinutes < 60) return '\${diff.inMinutes}min atrás';
+    if (diff.inHours < 24) return '\${diff.inHours}h atrás';
+    return '\${diff.inDays}d atrás';
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final datastoreCountAsync = ref.watch(datastoreCountProvider(game.id));
+    final snapshotCountAsync = ref.watch(snapshotCountProvider(game.id));
+
+    final datastoreLabel = datastoreCountAsync.when(
+      data: (n) => '\$n DataStore\${n == 1 ? '' : 's'}',
+      loading: () => '... DataStores',
+      error: (_, __) => '0 DataStores',
+    );
+
+    final snapshotLabel = snapshotCountAsync.when(
+      data: (n) => '\$n snapshot\${n == 1 ? '' : 's'}',
+      loading: () => '...',
+      error: (_, __) => '0 snapshots',
+    );
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -41,9 +58,11 @@ class GameCard extends ConsumerWidget {
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                    border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.2)),
                   ),
-                  child: const Icon(Icons.videogame_asset_rounded, color: AppColors.primary, size: 26),
+                  child: const Icon(Icons.videogame_asset_rounded,
+                      color: AppColors.primary, size: 26),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -56,7 +75,9 @@ class GameCard extends ConsumerWidget {
                             child: Text(
                               game.name,
                               style: const TextStyle(
-                                  color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w700),
+                                  color: AppColors.text,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -67,9 +88,9 @@ class GameCard extends ConsumerWidget {
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          _InfoChip(Icons.tag_rounded, 'ID: ${game.universeId}'),
+                          _InfoChip(Icons.tag_rounded, 'ID: \${game.universeId}'),
                           const SizedBox(width: 10),
-                          _InfoChip(Icons.storage_rounded, '0 DataStores'),
+                          _InfoChip(Icons.storage_rounded, datastoreLabel),
                         ],
                       ),
                     ],
@@ -81,17 +102,20 @@ class GameCard extends ConsumerWidget {
                   children: [
                     Text(
                       _formatTime(game.updatedAt),
-                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                      style: const TextStyle(
+                          color: AppColors.textSecondary, fontSize: 11),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      '0 snapshots',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                    Text(
+                      snapshotLabel,
+                      style: const TextStyle(
+                          color: AppColors.textSecondary, fontSize: 11),
                     ),
                     const SizedBox(height: 4),
                     const Text(
                       '— MB',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                      style: TextStyle(
+                          color: AppColors.textSecondary, fontSize: 11),
                     ),
                   ],
                 ),
@@ -123,7 +147,7 @@ class GameCard extends ConsumerWidget {
                   child: _ActionButton(
                     label: 'Configurar',
                     filled: false,
-                    onTap: () => context.push('/games/${game.id}'),
+                    onTap: () => context.push('/games/\${game.id}'),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -135,9 +159,11 @@ class GameCard extends ConsumerWidget {
                     decoration: BoxDecoration(
                       color: AppColors.error.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.error.withValues(alpha: 0.25)),
+                      border: Border.all(
+                          color: AppColors.error.withValues(alpha: 0.25)),
                     ),
-                    child: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 18),
+                    child: const Icon(Icons.delete_outline_rounded,
+                        color: AppColors.error, size: 18),
                   ),
                 ),
               ],
@@ -157,22 +183,25 @@ class GameCard extends ConsumerWidget {
           borderRadius: BorderRadius.circular(12),
           side: const BorderSide(color: AppColors.border),
         ),
-        title: const Text('Remover Jogo', style: TextStyle(color: AppColors.text)),
+        title: const Text('Remover Jogo',
+            style: TextStyle(color: AppColors.text)),
         content: Text(
-          'Deseja remover "${game.name}"? Esta ação não pode ser desfeita.',
+          'Deseja remover "\${game.name}"? Esta ação não pode ser desfeita.',
           style: const TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+            child: const Text('Cancelar',
+                style: TextStyle(color: AppColors.textSecondary)),
           ),
           TextButton(
             onPressed: () {
               ref.read(gamesProvider.notifier).deleteGame(game.id);
               Navigator.pop(ctx);
             },
-            child: const Text('Remover', style: TextStyle(color: AppColors.error)),
+            child: const Text('Remover',
+                style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
@@ -189,10 +218,14 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: active ? AppColors.success.withValues(alpha: 0.12) : AppColors.warning.withValues(alpha: 0.12),
+        color: active
+            ? AppColors.success.withValues(alpha: 0.12)
+            : AppColors.warning.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: active ? AppColors.success.withValues(alpha: 0.3) : AppColors.warning.withValues(alpha: 0.3),
+          color: active
+              ? AppColors.success.withValues(alpha: 0.3)
+              : AppColors.warning.withValues(alpha: 0.3),
         ),
       ),
       child: Text(
@@ -219,7 +252,9 @@ class _InfoChip extends StatelessWidget {
       children: [
         Icon(icon, size: 12, color: AppColors.textSecondary),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+        Text(label,
+            style: const TextStyle(
+                color: AppColors.textSecondary, fontSize: 12)),
       ],
     );
   }
@@ -229,7 +264,8 @@ class _ActionButton extends StatelessWidget {
   final String label;
   final bool filled;
   final VoidCallback onTap;
-  const _ActionButton({required this.label, required this.filled, required this.onTap});
+  const _ActionButton(
+      {required this.label, required this.filled, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -245,10 +281,12 @@ class _ActionButton extends StatelessWidget {
             color: filled ? AppColors.primary : AppColors.border,
           ),
           boxShadow: filled
-              ? [BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.2),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2))]
+              ? [
+                  BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.2),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2))
+                ]
               : null,
         ),
         child: Text(
