@@ -11,7 +11,7 @@ class DashboardRepository {
 
   Future<DashboardStatsModel> getStats(String? gameId) async {
     try {
-      final res = await _apiClient.dio.get('/v1/analytics/dashboard');
+      final res = await _apiClient.analyticsDio.get('/v1/analytics/dashboard');
       return DashboardStatsModel.fromJson(res.data as Map<String, dynamic>);
     } on DioException {
       return const DashboardStatsModel(
@@ -27,7 +27,7 @@ class DashboardRepository {
     try {
       final params = <String, dynamic>{'days': '30'};
       if (gameId != null) params['gameId'] = gameId;
-      final res = await _apiClient.dio.get('/v1/analytics/chart', queryParameters: params);
+      final res = await _apiClient.analyticsDio.get('/v1/analytics/chart', queryParameters: params);
       final list = res.data as List;
       return list.map((e) => BackupChartPoint.fromJson(e as Map<String, dynamic>)).toList();
     } on DioException {
@@ -39,7 +39,7 @@ class DashboardRepository {
     try {
       final params = <String, dynamic>{};
       if (gameId != null) params['gameId'] = gameId;
-      final res = await _apiClient.dio.get('/v1/analytics/insights', queryParameters: params);
+      final res = await _apiClient.analyticsDio.get('/v1/analytics/insights', queryParameters: params);
       final list = res.data as List;
       return list.map((e) => InsightModel.fromJson(e as Map<String, dynamic>)).toList();
     } on DioException {

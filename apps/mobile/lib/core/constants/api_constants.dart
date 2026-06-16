@@ -10,6 +10,7 @@ abstract class ApiConstants {
   static const String restoreBaseUrl = 'http://$_host:5005';
   static const String adminDataBaseUrl = 'http://$_host:5006';
   static const String auditBaseUrl = 'http://$_host:5007';
+  static const String analyticsBaseUrl = 'http://$_host:5005';
 
   static const Duration connectTimeout = Duration(seconds: 10);
   static const Duration receiveTimeout = Duration(seconds: 30);

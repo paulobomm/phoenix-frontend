@@ -61,6 +61,7 @@ export default function DataStoresPage() {
           <p className="text-sm mt-0.5" style={{ color: "var(--phoenix-text-secondary)" }}>Gerencie seus dados Roblox</p>
         </div>
         <button onClick={handleDiscover} disabled={!selectedProject || discovering}
+          suppressHydrationWarning
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border disabled:opacity-50 transition-all"
           style={{ borderColor: "var(--phoenix-border)", color: "var(--phoenix-text-secondary)", background: "var(--phoenix-card)" }}>
           {discovering ? (
