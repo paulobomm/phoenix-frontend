@@ -261,10 +261,14 @@ class _DownloadSheetState extends State<_DownloadSheet> {
       if (!mounted) return;
       Navigator.pop(context);
 
-      await Share.shareXFiles(
-        [XFile(file.path, mimeType: mimeType)],
-        subject: 'Phoenix Backup - ${widget.snapshot.name}',
+      final shareResult = await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: mimeType)],
+          subject: 'Phoenix Backup - ${widget.snapshot.name}',
+        ),
       );
+
+      if (shareResult.status == ShareResultStatus.dismissed) return;
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
