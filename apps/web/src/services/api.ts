@@ -8,24 +8,6 @@ const getToken = () =>
 const createApi = (baseURL: string) => {
   const api = axios.create({ baseURL });
 
-export const snapshotsApi = axios.create({
-  baseURL: "/api/snapshots",
-});
-
-export const restoreApi = axios.create({
-  baseURL: "/api/restore",
-});
-
-export const auditApi = axios.create({
-  baseURL: "/api/audit",
-});
-
-export const adminDataApi = axios.create({
-  baseURL: "/api/admin-data",
-});
-
-// Injeta o JWT em todas as APIs
-[iamApi, projectsApi, discoveryApi, snapshotsApi, restoreApi, auditApi, adminDataApi].forEach((api) => {
   api.interceptors.request.use((config) => {
     const token = getToken();
     if (token) config.headers.Authorization = `Bearer ${token}`;
