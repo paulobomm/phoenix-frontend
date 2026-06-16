@@ -261,11 +261,9 @@ class _DownloadSheetState extends State<_DownloadSheet> {
       if (!mounted) return;
       Navigator.pop(context);
 
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path, mimeType: mimeType)],
-          subject: 'Phoenix Backup - ${widget.snapshot.name}',
-        ),
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: mimeType)],
+        subject: 'Phoenix Backup - ${widget.snapshot.name}',
       );
     } catch (e) {
       if (!mounted) return;
@@ -391,7 +389,7 @@ class _FormatTile extends StatelessWidget {
                 children: [
                   Text(
                     'Baixar como .$label',
-                    style: TextStyle(
+                    style: const TextStyle(
                         color: AppColors.text,
                         fontSize: 14,
                         fontWeight: FontWeight.w600),
