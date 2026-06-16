@@ -3,6 +3,7 @@
 Frontend do projeto **Phoenix** — plataforma de gerenciamento de DataStores Roblox.
 
 Este repositório contém dois apps:
+
 - `apps/web` — painel web (Next.js 14)
 - `apps/mobile` — app mobile (Flutter)
 
@@ -11,15 +12,19 @@ Este repositório contém dois apps:
 ## Pré-requisitos
 
 ### Backend (phoenix-2)
+
 Antes de rodar o frontend, o backend precisa estar no ar. Certifique-se de ter:
+
 - [Docker](https://docs.docker.com/get-docker/) e [Docker Compose](https://docs.docker.com/compose/) instalados
 - Repositório `phoenix-data-management/phoenix-2` clonado
 
 ### Frontend Web
+
 - [Node.js](https://nodejs.org/) 18+
 - npm 9+
 
 ### Frontend Mobile
+
 - [Flutter](https://flutter.dev/docs/get-started/install) SDK (stable)
 - Android Studio com um AVD configurado (ou dispositivo físico)
 - Java 17+
@@ -39,25 +44,27 @@ npm run start:all
 
 Aguarde até ver todos os containers como `Started` ou `Running`. Os serviços ficam expostos nas portas:
 
-| Serviço     | Porta |
-|-------------|-------|
-| IAM         | 5001  |
-| Projects    | 5002  |
-| Discovery   | 5003  |
-| Snapshots   | 5004  |
-| Restore     | 5005  |
-| Admin-Data  | 5006  |
-| Audit       | 5007  |
-| RabbitMQ    | 5672  |
-| PostgreSQL  | 5432  |
-| MinIO       | 9000  |
+| Serviço    | Porta |
+| ---------- | ----- |
+| IAM        | 5001  |
+| Projects   | 5002  |
+| Discovery  | 5003  |
+| Snapshots  | 5004  |
+| Restore    | 5005  |
+| Admin-Data | 5006  |
+| Audit      | 5007  |
+| RabbitMQ   | 5672  |
+| PostgreSQL | 5432  |
+| MinIO      | 9000  |
 
 Para verificar se os containers estão saudáveis:
+
 ```bash
 docker ps
 ```
 
 Para ver os logs de um serviço específico:
+
 ```bash
 docker logs phoenix-2-discovery-1 -f
 ```
@@ -93,10 +100,12 @@ npm install
 npm run dev
 ```
 
-Abra [http://localhost:3000](http://localhost:3000) no navegador.
+Abra [http://localhost:3000](s) no navegador.
 
 ### Como funciona o proxy
+
 O Next.js redireciona as chamadas `/api/*` para os microserviços via `next.config.ts`:
+
 ```
 /api/iam/*        → localhost:5001/v1/*
 /api/projects/*   → localhost:5002/v1/*
@@ -146,13 +155,18 @@ flutter run -d <device_id>
 flutter run -d emulator-5554
 ```
 
+login: admin@phoenix.gg
+senha: ChangeMe123!
+
 ### 4.5 Configuração de host para o emulador
 
 O app mobile se conecta ao backend usando:
+
 - **Emulador Android** → `10.0.2.2` (alias para `localhost` do computador) ✅ já configurado
 - **Dispositivo físico** → substitua `10.0.2.2` pelo IP da sua máquina na rede local
 
 Para alterar o host, edite o arquivo:
+
 ```
 apps/mobile/lib/core/constants/api_constants.dart
 ```
@@ -165,6 +179,7 @@ static const String _host = '10.0.2.2'; // emulador
 ### 4.6 Comandos úteis durante o desenvolvimento
 
 Com o app rodando no terminal:
+
 - `r` — Hot reload (recarrega o código sem perder estado)
 - `R` — Hot restart (reinicia o app)
 - `q` — Encerrar o app
@@ -240,12 +255,14 @@ phoenix-frontend/
 ## 7. Tecnologias
 
 ### Web
+
 - [Next.js 14](https://nextjs.org/) com App Router
 - [TypeScript](https://www.typescriptlang.org/)
 - [Axios](https://axios-http.com/) para requisições HTTP
 - Tailwind CSS
 
 ### Mobile
+
 - [Flutter](https://flutter.dev/) (Dart)
 - [Riverpod](https://riverpod.dev/) para gerenciamento de estado
 - [go_router](https://pub.dev/packages/go_router) para navegação
@@ -253,6 +270,7 @@ phoenix-frontend/
 - [flutter_secure_storage](https://pub.dev/packages/flutter_secure_storage) para armazenar o JWT
 
 ### Backend (phoenix-2)
+
 - [NestJS](https://nestjs.com/) microserviços
 - [PostgreSQL](https://www.postgresql.org/) + [Drizzle ORM](https://orm.drizzle.team/)
 - [RabbitMQ](https://www.rabbitmq.com/) para eventos entre serviços
