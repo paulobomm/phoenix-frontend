@@ -249,8 +249,7 @@ class _DownloadSheetState extends State<_DownloadSheet> {
     setState(() => _loading = true);
     try {
       final content = format == 'json' ? _toJson() : _toCsv();
-      final mimeType =
-          format == 'json' ? 'application/json' : 'text/csv';
+      final mimeType = format == 'json' ? 'application/json' : 'text/csv';
       final fileName =
           'snapshot_${widget.snapshot.id.substring(0, 8)}_${DateTime.now().millisecondsSinceEpoch}.$format';
 
@@ -261,14 +260,11 @@ class _DownloadSheetState extends State<_DownloadSheet> {
       if (!mounted) return;
       Navigator.pop(context);
 
-      final shareResult = await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path, mimeType: mimeType)],
-          subject: 'Phoenix Backup - ${widget.snapshot.name}',
-        ),
+      // ignore: deprecated_member_use
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: mimeType)],
+        subject: 'Phoenix Backup - ${widget.snapshot.name}',
       );
-
-      if (shareResult.status == ShareResultStatus.dismissed) return;
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -583,7 +579,8 @@ class _BackupRow extends StatelessWidget {
                 const SizedBox(width: 6),
                 _IconBtn(Icons.restore_rounded, AppColors.primary, onRestore),
                 const SizedBox(width: 6),
-                _IconBtn(Icons.download_outlined, AppColors.primary, onDownload),
+                _IconBtn(
+                    Icons.download_outlined, AppColors.primary, onDownload),
               ],
             ),
           ),
