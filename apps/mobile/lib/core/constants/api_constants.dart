@@ -7,6 +7,8 @@ abstract class ApiConstants {
   static const String projectsBaseUrl = 'http://$_host:5002';
   static const String discoveryBaseUrl = 'http://$_host:5003';
   static const String snapshotsBaseUrl = 'http://$_host:5004';
+  static const String restoreBaseUrl = 'http://$_host:5005';
+  static const String adminDataBaseUrl = 'http://$_host:5006';
   static const String auditBaseUrl = 'http://$_host:5007';
   static const String analyticsBaseUrl = 'http://$_host:5005';
 

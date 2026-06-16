@@ -6,6 +6,7 @@ class ApiClient {
   late final Dio _projectsDio;
   late final Dio _discoveryDio;
   late final Dio _snapshotsDio;
+  late final Dio _restoreDio;
   late final Dio _auditDio;
   late final Dio _analyticsDio;
 
@@ -14,6 +15,7 @@ class ApiClient {
     _projectsDio = _buildDio(ApiConstants.projectsBaseUrl);
     _discoveryDio = _buildDio(ApiConstants.discoveryBaseUrl);
     _snapshotsDio = _buildDio(ApiConstants.snapshotsBaseUrl);
+    _restoreDio = _buildDio(ApiConstants.restoreBaseUrl);
     _auditDio = _buildDio(ApiConstants.auditBaseUrl);
     _analyticsDio = _buildDio(ApiConstants.analyticsBaseUrl);
   }
@@ -22,6 +24,7 @@ class ApiClient {
   Dio get projectsDio => _projectsDio;
   Dio get discoveryDio => _discoveryDio;
   Dio get snapshotsDio => _snapshotsDio;
+  Dio get restoreDio => _restoreDio;
   Dio get auditDio => _auditDio;
   Dio get analyticsDio => _analyticsDio;
 
@@ -37,7 +40,8 @@ class ApiClient {
     }
   }
 
-  List<Dio> get _allDios => [_iamDio, _projectsDio, _discoveryDio, _snapshotsDio, _auditDio, _analyticsDio];
+  List<Dio> get _allDios =>
+      [_iamDio, _projectsDio, _discoveryDio, _snapshotsDio, _restoreDio, _auditDio];
 
   Dio _buildDio(String baseUrl) {
     return Dio(
