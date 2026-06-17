@@ -2,6 +2,13 @@ import 'package:dio/dio.dart';
 import '../../../core/network/api_client.dart';
 import 'models/snapshot_model.dart';
 
+class ManifestResult {
+  final List<Map<String, dynamic>> entries;
+  final int total;
+
+  const ManifestResult({required this.entries, required this.total});
+}
+
 class SnapshotsRepository {
   final ApiClient _apiClient;
 
@@ -27,6 +34,29 @@ class SnapshotsRepository {
       return SnapshotModel.fromJson(res.data as Map<String, dynamic>);
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) return null;
+      throw Exception(_parseError(e));
+    }
+  }
+
+  Future<ManifestResult> getManifest(
+    String jobId, {
+    int page = 1,
+    int size = 500,
+  }) async {
+    try {
+      final res = await _apiClient.snapshotsDio.get(
+        '/v1/snapshots/$jobId/manifest',
+        queryParameters: {'_page': page, '_size': size},
+      );
+      final body = res.data as Map<String, dynamic>;
+      final total = (body['total'] as num?)?.toInt() ?? 0;
+      final raw = (body['data'] as List? ?? []);
+      final entries = raw
+          .map((e) => (e as Map<String, dynamic>)
+              .map((k, v) => MapEntry(k, v)))
+          .toList();
+      return ManifestResult(entries: entries, total: total);
+    } on DioException catch (e) {
       throw Exception(_parseError(e));
     }
   }
