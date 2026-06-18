@@ -4,6 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/phoenix_button.dart';
 import '../../../../shared/widgets/phoenix_text_field.dart';
 import '../../../auth/domain/auth_provider.dart';
+import '../../domain/plan_provider.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -668,32 +669,48 @@ class _SwitchTile extends StatelessWidget {
   }
 }
 
-class _PlanTab extends StatelessWidget {
+class _PlanTab extends ConsumerWidget {
   const _PlanTab();
 
   @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: const [
-        _PlanCurrentCard(),
-        SizedBox(height: 16),
-        _PlanUsageCard(),
-        SizedBox(height: 16),
-        _PlanUpgradeSection(),
-        SizedBox(height: 16),
-        _PlanInvoiceTable(),
-        SizedBox(height: 8),
-      ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    final usageAsync = ref.watch(planUsageProvider);
+    return usageAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      error: (e, _) => Center(child: Text('Erro ao carregar plano: $e', style: const TextStyle(color: AppColors.error))),
+      data: (usage) => ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          _PlanCurrentCard(usage: usage),
+          const SizedBox(height: 16),
+          _PlanUsageCard(usage: usage),
+          const SizedBox(height: 16),
+          const _PlanUpgradeSection(),
+          const SizedBox(height: 16),
+          const _PlanInvoiceTable(),
+          const SizedBox(height: 8),
+        ],
+      ),
     );
   }
 }
 
 class _PlanCurrentCard extends StatelessWidget {
-  const _PlanCurrentCard();
+  final PlanUsage usage;
+  const _PlanCurrentCard({required this.usage});
+
+  String _planPrice(String planName) {
+    switch (planName.toLowerCase()) {
+      case 'pro': return 'R\$ 29,00 / mês';
+      case 'studio': return 'R\$ 99,00 / mês';
+      default: return 'Gratuito';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final limits = usage.limits;
+    final planName = limits.planName;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -720,12 +737,12 @@ class _PlanCurrentCard extends StatelessWidget {
                 child: const Icon(Icons.star_rounded, color: AppColors.primary, size: 24),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Pro', style: TextStyle(color: AppColors.text, fontSize: 20, fontWeight: FontWeight.w800)),
-                    Text('R\$ 29,00 / mês', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                    Text(planName, style: const TextStyle(color: AppColors.text, fontSize: 20, fontWeight: FontWeight.w800)),
+                    Text(_planPrice(planName), style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
                   ],
                 ),
               ),
@@ -741,13 +758,26 @@ class _PlanCurrentCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          const _PlanBar(label: 'Storage', used: 8.5, total: 50, unit: 'GB'),
+          _PlanBar(
+            label: 'Storage',
+            used: usage.storageUsedGb,
+            total: limits.maxStorageGb,
+            unit: 'GB',
+          ),
           const SizedBox(height: 10),
-          const _PlanBar(label: 'Jogos', used: 3, total: 10, unit: ''),
+          _PlanBar(
+            label: 'Jogos',
+            used: usage.gamesUsed.toDouble(),
+            total: limits.maxGames.toDouble(),
+            unit: '',
+          ),
           const SizedBox(height: 10),
-          const _PlanBar(label: 'Backups este mês', used: 47, total: 500, unit: ''),
-          const SizedBox(height: 16),
-          const Text('Válido até 15/02/2026', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+          _PlanBar(
+            label: 'Backups este mês',
+            used: usage.backupsThisMonth.toDouble(),
+            total: limits.maxBackupsPerMonth.toDouble(),
+            unit: '',
+          ),
         ],
       ),
     );
@@ -794,10 +824,28 @@ class _PlanBar extends StatelessWidget {
 }
 
 class _PlanUsageCard extends StatelessWidget {
-  const _PlanUsageCard();
+  final PlanUsage usage;
+  const _PlanUsageCard({required this.usage});
+
+  String _formatStorage(double gb) {
+    if (gb < 0.001) return '0 / ${usage.limits.maxStorageGb.toStringAsFixed(0)} GB';
+    if (gb < 1) return '${(gb * 1024).toStringAsFixed(0)} MB / ${usage.limits.maxStorageGb.toStringAsFixed(0)} GB';
+    return '${gb.toStringAsFixed(2)} / ${usage.limits.maxStorageGb.toStringAsFixed(0)} GB';
+  }
+
+  String _formatKeys(int keys) {
+    if (keys >= 1000000) return '${(keys / 1000000).toStringAsFixed(1)}M';
+    if (keys >= 1000) {
+      final thousands = keys ~/ 1000;
+      final remainder = (keys % 1000).toString().padLeft(3, '0');
+      return '$thousands.$remainder';
+    }
+    return '$keys';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final limits = usage.limits;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -805,18 +853,18 @@ class _PlanUsageCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Uso Atual', style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.w600)),
-          SizedBox(height: 16),
-          _PlanStat('Jogos conectados', '3 / 10', AppColors.primary),
-          SizedBox(height: 12),
-          _PlanStat('Storage utilizado', '8.5 / 50 GB', AppColors.warning),
-          SizedBox(height: 12),
-          _PlanStat('Backups este mês', '47 / 500', AppColors.success),
-          SizedBox(height: 12),
-          _PlanStat('Keys protegidas', '4.269', AppColors.textSecondary),
+          const Text('Uso Atual', style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 16),
+          _PlanStat('Jogos conectados', '${usage.gamesUsed} / ${limits.maxGames}', AppColors.primary),
+          const SizedBox(height: 12),
+          _PlanStat('Storage utilizado', _formatStorage(usage.storageUsedGb), AppColors.warning),
+          const SizedBox(height: 12),
+          _PlanStat('Backups este mês', '${usage.backupsThisMonth} / ${limits.maxBackupsPerMonth}', AppColors.success),
+          const SizedBox(height: 12),
+          _PlanStat('Keys protegidas', _formatKeys(usage.totalKeys), AppColors.textSecondary),
         ],
       ),
     );
