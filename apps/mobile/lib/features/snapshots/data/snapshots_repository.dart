@@ -26,9 +26,10 @@ class SnapshotsRepository {
           .map((e) => SnapshotModel.fromJson(e as Map<String, dynamic>))
           .toList();
 
-      // For any snapshot still in progress, fetch the individual detail
-      // endpoint to get the real current status (list endpoint may be stale)
-      final inProgress = snapshots.where((s) => s.status == 'running' || s.status == 'pending').toList();
+      // For any snapshot not yet in a terminal state, fetch the individual
+      // detail endpoint to get the real current status (list endpoint may be stale)
+      const terminalStatuses = {'completed', 'failed'};
+      final inProgress = snapshots.where((s) => !terminalStatuses.contains(s.status)).toList();
       if (inProgress.isNotEmpty) {
         final updates = await Future.wait(
           inProgress.map((s) => getSnapshot(s.id).catchError((_) => null as SnapshotModel?)),
