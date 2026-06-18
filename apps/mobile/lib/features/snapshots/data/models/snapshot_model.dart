@@ -3,6 +3,9 @@ class SnapshotModel {
   final String projectId;
   final String? scheduleId;
   final String status;
+  final String? snapshotName;
+  final int? keyCount;
+  final int? sizeBytes;
   final DateTime? startedAt;
   final DateTime? completedAt;
   final String? error;
@@ -13,6 +16,9 @@ class SnapshotModel {
     required this.projectId,
     this.scheduleId,
     required this.status,
+    this.snapshotName,
+    this.keyCount,
+    this.sizeBytes,
     this.startedAt,
     this.completedAt,
     this.error,
@@ -25,6 +31,9 @@ class SnapshotModel {
       projectId: json['projectId'] as String? ?? '',
       scheduleId: json['scheduleId'] as String?,
       status: json['status'] as String? ?? 'pending',
+      snapshotName: json['name'] as String?,
+      keyCount: (json['keyCount'] as num?)?.toInt(),
+      sizeBytes: (json['sizeBytes'] as num?)?.toInt(),
       startedAt: json['startedAt'] != null
           ? DateTime.tryParse(json['startedAt'] as String)
           : null,
@@ -34,6 +43,24 @@ class SnapshotModel {
       error: json['error'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
     );
+  }
+
+  String get name =>
+      snapshotName ??
+      (scheduleId != null ? 'Backup Automático' : 'Backup Manual');
+
+  String get formattedSize {
+    final bytes = sizeBytes;
+    if (bytes == null) return '—';
+    if (bytes < 1024) return '${bytes}B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)}KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(2)}MB';
+  }
+
+  String get formattedDuration {
+    if (startedAt == null || completedAt == null) return '—';
+    final seconds = completedAt!.difference(startedAt!).inSeconds;
+    return '${seconds}s';
   }
 
   bool get isCompleted => status == 'completed';

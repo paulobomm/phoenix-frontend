@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/models/game_model.dart';
 import '../../domain/games_provider.dart';
+import '../../../datastores/domain/datastores_provider.dart';
+import '../../../snapshots/domain/snapshots_provider.dart';
 
 class GameCard extends ConsumerWidget {
   final GameModel game;
@@ -21,6 +23,21 @@ class GameCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final datastoreCountAsync = ref.watch(datastoreCountProvider(game.id));
+    final snapshotCountAsync = ref.watch(snapshotCountProvider(game.id));
+
+    final datastoreLabel = datastoreCountAsync.when(
+      data: (n) => "$n DataStore${n == 1 ? '' : 's'}",
+      loading: () => '... DataStores',
+      error: (_, __) => '0 DataStores',
+    );
+
+    final snapshotLabel = snapshotCountAsync.when(
+      data: (n) => "$n snapshot${n == 1 ? '' : 's'}",
+      loading: () => '...',
+      error: (_, __) => '0 snapshots',
+    );
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -55,8 +72,7 @@ class GameCard extends ConsumerWidget {
                           Expanded(
                             child: Text(
                               game.name,
-                              style: const TextStyle(
-                                  color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w700),
+                              style: const TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w700),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -67,9 +83,13 @@ class GameCard extends ConsumerWidget {
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          _InfoChip(Icons.tag_rounded, 'ID: ${game.universeId}'),
+                          Flexible(
+                            child: _InfoChip(Icons.tag_rounded, 'ID: ${game.universeId}'),
+                          ),
                           const SizedBox(width: 10),
-                          _InfoChip(Icons.storage_rounded, '0 DataStores'),
+                          Flexible(
+                            child: _InfoChip(Icons.storage_rounded, datastoreLabel),
+                          ),
                         ],
                       ),
                     ],
@@ -84,15 +104,12 @@ class GameCard extends ConsumerWidget {
                       style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      '0 snapshots',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                    Text(
+                      snapshotLabel,
+                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      '— MB',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
-                    ),
+                    const Text('— MB', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
                   ],
                 ),
               ],
@@ -219,7 +236,13 @@ class _InfoChip extends StatelessWidget {
       children: [
         Icon(icon, size: 12, color: AppColors.textSecondary),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+        Flexible(
+          child: Text(
+            label,
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ],
     );
   }
@@ -241,14 +264,9 @@ class _ActionButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: filled ? AppColors.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: filled ? AppColors.primary : AppColors.border,
-          ),
+          border: Border.all(color: filled ? AppColors.primary : AppColors.border),
           boxShadow: filled
-              ? [BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.2),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2))]
+              ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.2), blurRadius: 6, offset: const Offset(0, 2))]
               : null,
         ),
         child: Text(

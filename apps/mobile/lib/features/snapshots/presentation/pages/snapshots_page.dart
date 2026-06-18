@@ -1,12 +1,18 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/empty_state_widget.dart';
 import '../../../../shared/widgets/skeleton_loader.dart';
 import '../../../games/presentation/widgets/game_selector_widget.dart';
 import '../../domain/snapshots_provider.dart';
 import '../../data/models/snapshot_model.dart';
+import '../../data/snapshots_repository.dart';
+import '../../../games/domain/games_provider.dart';
 
 class SnapshotsPage extends ConsumerStatefulWidget {
   const SnapshotsPage({super.key});
@@ -18,7 +24,7 @@ class SnapshotsPage extends ConsumerStatefulWidget {
 class _SnapshotsPageState extends ConsumerState<SnapshotsPage> {
   String _filter = 'all';
 
-  final _filters = {
+  final _filters = const {
     'all': 'Todos',
     'auto': 'Automático',
     'manual': 'Manual',
@@ -34,6 +40,23 @@ class _SnapshotsPageState extends ConsumerState<SnapshotsPage> {
         '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
+  Future<void> _showDownloadSheet(BuildContext context, SnapshotModel snapshot) async {
+    final repo = ref.read(snapshotsRepositoryProvider);
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => _DownloadSheet(
+        snapshot: snapshot,
+        repository: repo,
+        isAuto: _isAuto(snapshot),
+        formattedDate: _formatDate(snapshot.createdAt),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final snapshotsAsync = ref.watch(snapshotsProvider);
@@ -43,7 +66,6 @@ class _SnapshotsPageState extends ConsumerState<SnapshotsPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // AppBar row
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 8, 0),
               child: Row(
@@ -67,7 +89,6 @@ class _SnapshotsPageState extends ConsumerState<SnapshotsPage> {
               ),
             ),
             const GameSelectorWidget(),
-            // Filter pills
             SizedBox(
               height: 40,
               child: ListView(
@@ -153,10 +174,11 @@ class _SnapshotsPageState extends ConsumerState<SnapshotsPage> {
                               snapshot: s,
                               isAuto: _isAuto(s),
                               formattedDate: _formatDate(s.createdAt),
-                              onView: () =>
-                                  context.push('/snapshots/${s.id}'),
+                              onView: () => context.push('/snapshots/${s.id}'),
                               onRestore: () =>
                                   context.push('/snapshots/${s.id}/restore'),
+                              onDownload: () =>
+                                  _showDownloadSheet(context, s),
                             )),
                         const SizedBox(height: 16),
                       ],
@@ -171,6 +193,277 @@ class _SnapshotsPageState extends ConsumerState<SnapshotsPage> {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Download bottom sheet
+// ---------------------------------------------------------------------------
+
+class _DownloadSheet extends StatefulWidget {
+  final SnapshotModel snapshot;
+  final SnapshotsRepository repository;
+  final bool isAuto;
+  final String formattedDate;
+
+  const _DownloadSheet({
+    required this.snapshot,
+    required this.repository,
+    required this.isAuto,
+    required this.formattedDate,
+  });
+
+  @override
+  State<_DownloadSheet> createState() => _DownloadSheetState();
+}
+
+class _DownloadSheetState extends State<_DownloadSheet> {
+  bool _loading = false;
+  String _loadingMsg = 'Buscando dados...';
+
+  Map<String, dynamic> _metaMap() => {
+        'id': widget.snapshot.id,
+        'projectId': widget.snapshot.projectId,
+        'scheduleId': widget.snapshot.scheduleId,
+        'name': widget.snapshot.name,
+        'status': widget.snapshot.status,
+        'type': widget.isAuto ? 'automatic' : 'manual',
+        'keyCount': widget.snapshot.keyCount,
+        'sizeBytes': widget.snapshot.sizeBytes,
+        'formattedSize': widget.snapshot.formattedSize,
+        'startedAt': widget.snapshot.startedAt?.toIso8601String(),
+        'completedAt': widget.snapshot.completedAt?.toIso8601String(),
+        'createdAt': widget.snapshot.createdAt.toIso8601String(),
+        'error': widget.snapshot.error,
+      };
+
+  Future<List<Map<String, dynamic>>> _fetchAllEntries() async {
+    final entries = <Map<String, dynamic>>[];
+    int page = 1;
+    const pageSize = 500;
+    while (true) {
+      final result = await widget.repository
+          .getManifest(widget.snapshot.id, page: page, size: pageSize);
+      entries.addAll(result.entries);
+      if (entries.length >= result.total || result.entries.isEmpty) break;
+      page++;
+    }
+    return entries;
+  }
+
+  String _toJson(List<Map<String, dynamic>> entries) {
+    const encoder = JsonEncoder.withIndent('  ');
+    return encoder.convert({
+      'snapshot': _metaMap(),
+      'entries': entries,
+    });
+  }
+
+  String _toCsv(List<Map<String, dynamic>> entries) {
+    if (entries.isEmpty) {
+      // fallback: metadata only
+      final m = _metaMap();
+      final headers = m.keys.join(',');
+      final values = m.values.map(_csvCell).join(',');
+      return '$headers\n$values';
+    }
+    final headers = entries.first.keys.join(',');
+    final rows = entries.map((e) => e.values.map(_csvCell).join(',')).join('\n');
+    return '$headers\n$rows';
+  }
+
+  String _csvCell(dynamic v) {
+    final s = (v ?? '').toString();
+    return s.contains(',') || s.contains('"') || s.contains('\n')
+        ? '"${s.replaceAll('"', '""')}"'
+        : s;
+  }
+
+  Future<void> _download(String format) async {
+    setState(() {
+      _loading = true;
+      _loadingMsg = 'Buscando dados do backup...';
+    });
+    try {
+      final entries = await _fetchAllEntries();
+
+      if (mounted) setState(() => _loadingMsg = 'Gerando arquivo...');
+
+      final content =
+          format == 'json' ? _toJson(entries) : _toCsv(entries);
+      final mimeType = format == 'json' ? 'application/json' : 'text/csv';
+      final fileName =
+          'snapshot_${widget.snapshot.id.substring(0, 8)}_${DateTime.now().millisecondsSinceEpoch}.$format';
+
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/$fileName');
+      await file.writeAsString(content);
+
+      if (!mounted) return;
+      Navigator.pop(context);
+
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: mimeType)],
+        subject: 'Phoenix Backup - ${widget.snapshot.name}',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao exportar: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.download_rounded,
+                  color: AppColors.primary, size: 20),
+              const SizedBox(width: 10),
+              const Text(
+                'Exportar Backup',
+                style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700),
+              ),
+              const Spacer(),
+              if (!_loading)
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: const Icon(Icons.close_rounded,
+                      color: AppColors.textSecondary, size: 20),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${widget.snapshot.name} · ${widget.formattedDate}',
+            style: const TextStyle(
+                color: AppColors.textSecondary, fontSize: 12),
+          ),
+          const SizedBox(height: 20),
+          if (_loading)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Column(
+                  children: [
+                    const CircularProgressIndicator(color: AppColors.primary),
+                    const SizedBox(height: 14),
+                    Text(_loadingMsg,
+                        style: const TextStyle(
+                            color: AppColors.textSecondary, fontSize: 13)),
+                  ],
+                ),
+              ),
+            )
+          else ..._formatOptions(),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _formatOptions() => [
+        _FormatTile(
+          icon: Icons.data_object_rounded,
+          label: 'JSON',
+          description:
+              'Metadados + todas as entradas do backup',
+          color: const Color(0xFF3b82f6),
+          onTap: () => _download('json'),
+        ),
+        const SizedBox(height: 10),
+        _FormatTile(
+          icon: Icons.table_chart_rounded,
+          label: 'CSV',
+          description: 'Entradas como tabela — Excel / Google Sheets',
+          color: const Color(0xFF22c55e),
+          onTap: () => _download('csv'),
+        ),
+      ];
+}
+
+class _FormatTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String description;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _FormatTile({
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Baixar como .$label',
+                    style: const TextStyle(
+                        color: AppColors.text,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    description,
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                color: color.withValues(alpha: 0.6), size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Table
+// ---------------------------------------------------------------------------
 
 class _TableHeader extends StatelessWidget {
   @override
@@ -220,6 +513,7 @@ class _BackupRow extends StatelessWidget {
   final String formattedDate;
   final VoidCallback onView;
   final VoidCallback onRestore;
+  final VoidCallback onDownload;
 
   const _BackupRow({
     required this.snapshot,
@@ -227,6 +521,7 @@ class _BackupRow extends StatelessWidget {
     required this.formattedDate,
     required this.onView,
     required this.onRestore,
+    required this.onDownload,
   });
 
   @override
@@ -272,8 +567,7 @@ class _BackupRow extends StatelessWidget {
           Expanded(
             flex: 2,
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: isAuto
                     ? AppColors.primary.withValues(alpha: 0.12)
@@ -283,25 +577,25 @@ class _BackupRow extends StatelessWidget {
               child: Text(
                 isAuto ? 'Automático' : 'Manual',
                 style: TextStyle(
-                  color:
-                      isAuto ? AppColors.primary : AppColors.textSecondary,
+                  color: isAuto ? AppColors.primary : AppColors.textSecondary,
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ),
           ),
-          const Expanded(
+          Expanded(
             flex: 2,
             child: Text(
-              '—',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              snapshot.formattedSize,
+              style: const TextStyle(
+                  color: AppColors.textSecondary, fontSize: 12),
             ),
           ),
           Expanded(
             flex: 1,
             child: Text(
-              '${snapshot.keyCount}',
+              '${snapshot.keyCount ?? "—"}',
               style: const TextStyle(
                   color: AppColors.textSecondary, fontSize: 12),
             ),
@@ -309,8 +603,7 @@ class _BackupRow extends StatelessWidget {
           Expanded(
             flex: 2,
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: statusColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(5),
@@ -330,13 +623,13 @@ class _BackupRow extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                _IconBtn(Icons.visibility_outlined, AppColors.textSecondary,
-                    onView),
+                _IconBtn(Icons.visibility_outlined,
+                    AppColors.textSecondary, onView),
                 const SizedBox(width: 6),
                 _IconBtn(Icons.restore_rounded, AppColors.primary, onRestore),
                 const SizedBox(width: 6),
-                _IconBtn(Icons.download_outlined, AppColors.textSecondary,
-                    () {}),
+                _IconBtn(
+                    Icons.download_outlined, AppColors.primary, onDownload),
               ],
             ),
           ),

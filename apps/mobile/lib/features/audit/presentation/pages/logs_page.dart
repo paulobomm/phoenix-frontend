@@ -16,11 +16,12 @@ class LogsPage extends ConsumerStatefulWidget {
 class _LogsPageState extends ConsumerState<LogsPage> {
   String _filter = 'all';
 
-  final _filters = {
+  final _filters = const {
     'all': 'Todos',
     'backup': 'Backup',
     'restore': 'Restore',
     'error': 'Erros',
+    'warning': 'Avisos',
   };
 
   @override
@@ -43,15 +44,19 @@ class _LogsPageState extends ConsumerState<LogsPage> {
                       children: [
                         Text('Histórico',
                             style: TextStyle(
-                                color: AppColors.text, fontSize: 22, fontWeight: FontWeight.w700)),
+                                color: AppColors.text,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700)),
                         SizedBox(height: 2),
                         Text('Registro de todas as atividades',
-                            style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                            style: TextStyle(
+                                color: AppColors.textSecondary, fontSize: 13)),
                       ],
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.filter_list_rounded, color: AppColors.textSecondary),
+                    icon: const Icon(Icons.filter_list_rounded,
+                        color: AppColors.textSecondary),
                     onPressed: () {},
                   ),
                 ],
@@ -69,18 +74,25 @@ class _LogsPageState extends ConsumerState<LogsPage> {
                           child: GestureDetector(
                             onTap: () => setState(() => _filter = e.key),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 7),
                               decoration: BoxDecoration(
-                                color: _filter == e.key ? AppColors.primary : AppColors.card,
+                                color: _filter == e.key
+                                    ? AppColors.primary
+                                    : AppColors.card,
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: _filter == e.key ? AppColors.primary : AppColors.border,
+                                  color: _filter == e.key
+                                      ? AppColors.primary
+                                      : AppColors.border,
                                 ),
                               ),
                               child: Text(
                                 e.value,
                                 style: TextStyle(
-                                  color: _filter == e.key ? Colors.white : AppColors.textSecondary,
+                                  color: _filter == e.key
+                                      ? Colors.white
+                                      : AppColors.textSecondary,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -102,34 +114,57 @@ class _LogsPageState extends ConsumerState<LogsPage> {
                     child: SkeletonCard(),
                   ),
                 ),
-                error: (e, _) =>
-                    Center(child: Text('Erro: $e', style: const TextStyle(color: AppColors.error))),
+                error: (e, _) => Center(
+                    child: Text('Erro: $e',
+                        style: const TextStyle(color: AppColors.error))),
                 data: (logs) {
                   var filtered = logs;
                   if (_filter == 'error') {
-                    filtered = logs.where((l) => l.eventType.toLowerCase().contains('error') || l.eventType.toLowerCase().contains('fail')).toList();
+                    filtered = logs
+                        .where((l) =>
+                            l.eventType.contains('failed') ||
+                            l.eventType.contains('error'))
+                        .toList();
+                  } else if (_filter == 'warning') {
+                    filtered = logs
+                        .where((l) => l.eventType.contains('warning'))
+                        .toList();
                   } else if (_filter == 'backup') {
-                    filtered = logs.where((l) => l.eventType.toLowerCase().contains('backup') || l.routingKey.toLowerCase().contains('backup')).toList();
+                    filtered = logs
+                        .where((l) =>
+                            l.routingKey.contains('snapshot') ||
+                            l.eventType.contains('snapshot'))
+                        .toList();
                   } else if (_filter == 'restore') {
-                    filtered = logs.where((l) => l.eventType.toLowerCase().contains('restore') || l.routingKey.toLowerCase().contains('restore')).toList();
+                    filtered = logs
+                        .where((l) =>
+                            l.routingKey.contains('restore') ||
+                            l.eventType.contains('restore'))
+                        .toList();
                   }
 
                   if (filtered.isEmpty) {
                     return const EmptyStateWidget(
                       icon: Icons.history_rounded,
-                      title: 'Nenhum log encontrado',
+                      title: 'Nenhum evento registrado',
                       description: 'As atividades aparecerão aqui',
                     );
                   }
 
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: filtered.length,
-                    itemBuilder: (context, i) {
-                      final log = filtered[i];
-                      final isLast = i == filtered.length - 1;
-                      return _TimelineItem(log: log, isLast: isLast);
+                  return RefreshIndicator(
+                    color: AppColors.primary,
+                    onRefresh: () async {
+                      ref.invalidate(logsProvider);
                     },
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: filtered.length,
+                      itemBuilder: (context, i) {
+                        final log = filtered[i];
+                        final isLast = i == filtered.length - 1;
+                        return _TimelineItem(log: log, isLast: isLast);
+                      },
+                    ),
                   );
                 },
               ),
@@ -148,8 +183,10 @@ class _TimelineItem extends StatelessWidget {
   const _TimelineItem({required this.log, required this.isLast});
 
   _LogMeta _getMeta() {
+    final rk = log.routingKey.toLowerCase();
     final et = log.eventType.toLowerCase();
-    if (et.contains('backup') || log.routingKey.toLowerCase().contains('backup')) {
+
+    if (rk.contains('snapshot') || et.contains('snapshot')) {
       return const _LogMeta(
         icon: Icons.cloud_upload_outlined,
         dotColor: AppColors.primary,
@@ -158,7 +195,7 @@ class _TimelineItem extends StatelessWidget {
         badgeColor: AppColors.primary,
       );
     }
-    if (et.contains('restore') || log.routingKey.toLowerCase().contains('restore')) {
+    if (rk.contains('restore') || et.contains('restore')) {
       return const _LogMeta(
         icon: Icons.restore_rounded,
         dotColor: AppColors.warning,
@@ -167,22 +204,13 @@ class _TimelineItem extends StatelessWidget {
         badgeColor: AppColors.warning,
       );
     }
-    if (et.contains('error') || et.contains('fail')) {
+    if (et.contains('failed') || et.contains('error')) {
       return const _LogMeta(
         icon: Icons.error_outline_rounded,
         dotColor: AppColors.error,
         iconColor: AppColors.error,
         badge: 'Erro',
         badgeColor: AppColors.error,
-      );
-    }
-    if (et.contains('login') || et.contains('auth')) {
-      return const _LogMeta(
-        icon: Icons.login_rounded,
-        dotColor: AppColors.textSecondary,
-        iconColor: AppColors.textSecondary,
-        badge: 'Login',
-        badgeColor: AppColors.textSecondary,
       );
     }
     return const _LogMeta(
@@ -195,23 +223,20 @@ class _TimelineItem extends StatelessWidget {
   }
 
   String _formatTime(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
+    final diff = DateTime.now().difference(dt);
     if (diff.inMinutes < 60) return 'Há ${diff.inMinutes}min';
     if (diff.inHours < 24) return 'Há ${diff.inHours}h';
     return 'Há ${diff.inDays}d';
   }
 
-  String get _label {
-    final et = log.eventType;
-    return et.isNotEmpty ? et : log.routingKey;
-  }
-
-  String get _detail {
-    if (log.routingKey.isNotEmpty && log.exchange.isNotEmpty) {
-      return '${log.exchange} › ${log.routingKey}';
-    }
-    return log.routingKey.isNotEmpty ? log.routingKey : log.exchange;
+  String _formatTitle(String eventType) {
+    return eventType
+        .replaceAll('.', ' ')
+        .replaceAll('_', ' ')
+        .split(' ')
+        .map((w) =>
+            w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : w)
+        .join(' ');
   }
 
   @override
@@ -229,11 +254,15 @@ class _TimelineItem extends StatelessWidget {
                 Container(
                   width: 10,
                   height: 10,
-                  margin: const EdgeInsets.only(top: 16),
+                  margin: const EdgeInsets.only(top: 20),
                   decoration: BoxDecoration(
                     color: meta.dotColor,
                     shape: BoxShape.circle,
-                    boxShadow: [BoxShadow(color: meta.dotColor.withValues(alpha: 0.4), blurRadius: 6)],
+                    boxShadow: [
+                      BoxShadow(
+                          color: meta.dotColor.withValues(alpha: 0.4),
+                          blurRadius: 6)
+                    ],
                   ),
                 ),
                 if (!isLast)
@@ -274,35 +303,45 @@ class _TimelineItem extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _label.replaceAll('.', ' ').replaceAll('_', ' ').split(' ').map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : w).join(' '),
-                          style: const TextStyle(color: AppColors.text, fontWeight: FontWeight.w600, fontSize: 13),
+                          _formatTitle(log.eventType),
+                          style: const TextStyle(
+                              color: AppColors.text,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13),
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          _detail,
-                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                          '${log.exchange} · ${log.routingKey}',
+                          style: const TextStyle(
+                              color: AppColors.textSecondary, fontSize: 12),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 6),
                         Text(
                           _formatTime(log.occurredAt),
-                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                          style: const TextStyle(
+                              color: AppColors.textSecondary, fontSize: 11),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: meta.badgeColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: meta.badgeColor.withValues(alpha: 0.25)),
+                      border: Border.all(
+                          color: meta.badgeColor.withValues(alpha: 0.25)),
                     ),
                     child: Text(
                       meta.badge,
-                      style: TextStyle(color: meta.badgeColor, fontSize: 10, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                          color: meta.badgeColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600),
                     ),
                   ),
                 ],

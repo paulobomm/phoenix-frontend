@@ -8,18 +8,30 @@ class BackupChartWidget extends StatelessWidget {
 
   const BackupChartWidget({super.key, required this.points});
 
+  static const _months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
   @override
   Widget build(BuildContext context) {
     final effectivePoints = points.isEmpty
-        ? List.generate(30, (i) => BackupChartPoint(date: DateTime.now().subtract(Duration(days: 29 - i)), count: 0))
+        ? List.generate(
+            30,
+            (i) => BackupChartPoint(
+              date: DateTime.now().subtract(Duration(days: 29 - i)),
+              count: 0,
+            ),
+          )
         : points;
 
     final spots = effectivePoints.asMap().entries.map((e) {
       return FlSpot(e.key.toDouble(), e.value.count.toDouble());
     }).toList();
 
-    final maxCount = effectivePoints.map((p) => p.count).fold(0, (a, b) => a > b ? a : b);
-    final maxY = (maxCount + 2).toDouble();
+    final maxCount =
+        effectivePoints.map((p) => p.count).reduce((a, b) => a > b ? a : b);
+    final maxY = (maxCount < 2 ? 4 : maxCount + 2).toDouble();
+
+    final d = effectivePoints.first.date;
+    final firstLabel = '${_months[d.month - 1]} ${d.day}';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -36,16 +48,20 @@ class BackupChartWidget extends StatelessWidget {
             children: [
               const Text(
                 'Atividade de Backup',
-                style: TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: AppColors.background,
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(color: AppColors.border),
                 ),
-                child: const Text('30 dias', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                child: const Text('30 dias',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
               ),
             ],
           ),
@@ -57,7 +73,7 @@ class BackupChartWidget extends StatelessWidget {
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  horizontalInterval: 2,
+                  horizontalInterval: (maxY / 4).ceilToDouble().clamp(1, double.infinity),
                   getDrawingHorizontalLine: (value) => const FlLine(
                     color: AppColors.border,
                     strokeWidth: 1,
@@ -72,7 +88,7 @@ class BackupChartWidget extends StatelessWidget {
                 ),
                 borderData: FlBorderData(show: false),
                 minX: 0,
-                maxX: (spots.length - 1).toDouble().clamp(1, double.infinity),
+                maxX: (spots.length - 1).toDouble(),
                 minY: 0,
                 maxY: maxY,
                 lineBarsData: [
@@ -100,11 +116,13 @@ class BackupChartWidget extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Mai 1', style: TextStyle(color: AppColors.textSecondary, fontSize: 10)),
-              Text('Hoje', style: TextStyle(color: AppColors.textSecondary, fontSize: 10)),
+              Text(firstLabel,
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 10)),
+              const Text('Hoje',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 10)),
             ],
           ),
         ],
