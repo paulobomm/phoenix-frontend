@@ -22,9 +22,25 @@ class SnapshotsRepository {
       );
       final data = res.data;
       final list = data is Map ? (data['data'] as List? ?? []) : (data as List);
-      return list
+      final snapshots = list
           .map((e) => SnapshotModel.fromJson(e as Map<String, dynamic>))
           .toList();
+
+      // For any snapshot still in progress, fetch the individual detail
+      // endpoint to get the real current status (list endpoint may be stale)
+      final inProgress = snapshots.where((s) => s.status == 'running' || s.status == 'pending').toList();
+      if (inProgress.isNotEmpty) {
+        final updates = await Future.wait(
+          inProgress.map((s) => getSnapshot(s.id).catchError((_) => null as SnapshotModel?)),
+        );
+        final updateMap = <String, SnapshotModel>{};
+        for (final u in updates) {
+          if (u != null) updateMap[u.id] = u;
+        }
+        return snapshots.map((s) => updateMap[s.id] ?? s).toList();
+      }
+
+      return snapshots;
     } on DioException catch (e) {
       throw Exception(_parseError(e));
     }
