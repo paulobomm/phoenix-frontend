@@ -187,7 +187,10 @@ class _SnapshotsPageState extends ConsumerState<SnapshotsPage> {
                   return RefreshIndicator(
                     color: AppColors.primary,
                     backgroundColor: AppColors.card,
-                    onRefresh: () async => ref.invalidate(snapshotsProvider),
+                    onRefresh: () async {
+                      ref.invalidate(snapshotsProvider);
+                      await ref.read(snapshotsProvider.future);
+                    },
                     child: ListView(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       children: [
