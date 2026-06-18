@@ -16,8 +16,10 @@ class SnapshotsRepository {
 
   Future<List<SnapshotModel>> getSnapshots(String projectId) async {
     try {
-      final res = await _apiClient.snapshotsDio
-          .get('/v1/projects/$projectId/snapshots');
+      final res = await _apiClient.snapshotsDio.get(
+        '/v1/projects/$projectId/snapshots',
+        options: Options(headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}),
+      );
       final data = res.data;
       final list = data is Map ? (data['data'] as List? ?? []) : (data as List);
       return list
