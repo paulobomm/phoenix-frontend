@@ -12,26 +12,11 @@ class PhoenixLogo extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
+        Image.asset(
+          'assets/images/phoenix_logo.png',
           width: size,
           height: size,
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(size * 0.25),
-            border: Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.3),
-                blurRadius: 24,
-                spreadRadius: 0,
-              ),
-            ],
-          ),
-          child: Icon(
-            Icons.local_fire_department_rounded,
-            color: AppColors.primary,
-            size: size * 0.55,
-          ),
+          fit: BoxFit.contain,
         ),
         const SizedBox(height: 12),
         Text(

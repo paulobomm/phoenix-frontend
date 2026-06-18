@@ -108,15 +108,11 @@ class _Sidebar extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
-                Container(
+                Image.asset(
+                  'assets/images/phoenix_logo.png',
                   width: 32,
                   height: 32,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 12)],
-                  ),
-                  child: const Icon(Icons.local_fire_department_rounded, color: AppColors.primary, size: 18),
+                  fit: BoxFit.contain,
                 ),
                 const SizedBox(width: 10),
                 const Text(

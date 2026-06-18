@@ -45,17 +45,11 @@ class DashboardPage extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  Container(
+                  Image.asset(
+                    'assets/images/phoenix_logo.png',
                     width: 36,
                     height: 36,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                        Icons.local_fire_department_rounded,
-                        color: AppColors.primary,
-                        size: 20),
+                    fit: BoxFit.contain,
                   ),
                 ],
               ),
