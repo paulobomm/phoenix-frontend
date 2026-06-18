@@ -30,8 +30,7 @@ class _RestoreWizardPageState extends ConsumerState<RestoreWizardPage> {
   }
 
   String _snapshotLabel(SnapshotModel s) {
-    final kind = s.snapshotType == 'manual' ? 'Manual' : 'Automático';
-    return '$kind — ${_formatDate(s.createdAt)}';
+    return '${s.name} — ${_formatDate(s.createdAt)}';
   }
 
   String _formatSize(int? bytes) {
