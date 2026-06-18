@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -23,6 +24,27 @@ class SnapshotsPage extends ConsumerStatefulWidget {
 
 class _SnapshotsPageState extends ConsumerState<SnapshotsPage> {
   String _filter = 'all';
+  Timer? _pollingTimer;
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
+  }
+
+  void _schedulePollingIfNeeded(List<SnapshotModel> snapshots) {
+    final hasRunning = snapshots.any(
+      (s) => s.status == 'running' || s.status == 'pending',
+    );
+    if (hasRunning && _pollingTimer == null) {
+      _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+        if (mounted) ref.invalidate(snapshotsProvider);
+      });
+    } else if (!hasRunning) {
+      _pollingTimer?.cancel();
+      _pollingTimer = null;
+    }
+  }
 
   final _filters = const {
     'all': 'Todos',
@@ -144,6 +166,7 @@ class _SnapshotsPageState extends ConsumerState<SnapshotsPage> {
                     child: Text('Erro: $e',
                         style: const TextStyle(color: AppColors.error))),
                 data: (snapshots) {
+                  _schedulePollingIfNeeded(snapshots);
                   final filtered = snapshots.where((s) {
                     if (_filter == 'auto') return _isAuto(s);
                     if (_filter == 'manual') return !_isAuto(s);
