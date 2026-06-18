@@ -11,6 +11,8 @@ import '../../../../shared/widgets/skeleton_loader.dart';
 import '../../../games/presentation/widgets/game_selector_widget.dart';
 import '../../domain/snapshots_provider.dart';
 import '../../data/models/snapshot_model.dart';
+import '../../data/snapshots_repository.dart';
+import '../../../games/domain/games_provider.dart';
 
 class SnapshotsPage extends ConsumerStatefulWidget {
   const SnapshotsPage({super.key});
@@ -39,6 +41,7 @@ class _SnapshotsPageState extends ConsumerState<SnapshotsPage> {
   }
 
   Future<void> _showDownloadSheet(BuildContext context, SnapshotModel snapshot) async {
+    final repo = ref.read(snapshotsRepositoryProvider);
     await showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.card,
@@ -47,6 +50,7 @@ class _SnapshotsPageState extends ConsumerState<SnapshotsPage> {
       ),
       builder: (ctx) => _DownloadSheet(
         snapshot: snapshot,
+        repository: repo,
         isAuto: _isAuto(snapshot),
         formattedDate: _formatDate(snapshot.createdAt),
       ),
@@ -196,11 +200,13 @@ class _SnapshotsPageState extends ConsumerState<SnapshotsPage> {
 
 class _DownloadSheet extends StatefulWidget {
   final SnapshotModel snapshot;
+  final SnapshotsRepository repository;
   final bool isAuto;
   final String formattedDate;
 
   const _DownloadSheet({
     required this.snapshot,
+    required this.repository,
     required this.isAuto,
     required this.formattedDate,
   });
@@ -211,8 +217,9 @@ class _DownloadSheet extends StatefulWidget {
 
 class _DownloadSheetState extends State<_DownloadSheet> {
   bool _loading = false;
+  String _loadingMsg = 'Buscando dados...';
 
-  Map<String, dynamic> _toMap() => {
+  Map<String, dynamic> _metaMap() => {
         'id': widget.snapshot.id,
         'projectId': widget.snapshot.projectId,
         'scheduleId': widget.snapshot.scheduleId,
@@ -228,29 +235,61 @@ class _DownloadSheetState extends State<_DownloadSheet> {
         'error': widget.snapshot.error,
       };
 
-  String _toJson() {
-    const encoder = JsonEncoder.withIndent('  ');
-    return encoder.convert(_toMap());
+  Future<List<Map<String, dynamic>>> _fetchAllEntries() async {
+    final entries = <Map<String, dynamic>>[];
+    int page = 1;
+    const pageSize = 500;
+    while (true) {
+      final result = await widget.repository
+          .getManifest(widget.snapshot.id, page: page, size: pageSize);
+      entries.addAll(result.entries);
+      if (entries.length >= result.total || result.entries.isEmpty) break;
+      page++;
+    }
+    return entries;
   }
 
-  String _toCsv() {
-    final m = _toMap();
-    final headers = m.keys.join(',');
-    final values = m.values.map((v) {
-      final s = (v ?? '').toString();
-      return s.contains(',') || s.contains('"') || s.contains('\n')
-          ? '"${s.replaceAll('"', '""')}"'
-          : s;
-    }).join(',');
-    return '$headers\n$values';
+  String _toJson(List<Map<String, dynamic>> entries) {
+    const encoder = JsonEncoder.withIndent('  ');
+    return encoder.convert({
+      'snapshot': _metaMap(),
+      'entries': entries,
+    });
+  }
+
+  String _toCsv(List<Map<String, dynamic>> entries) {
+    if (entries.isEmpty) {
+      // fallback: metadata only
+      final m = _metaMap();
+      final headers = m.keys.join(',');
+      final values = m.values.map(_csvCell).join(',');
+      return '$headers\n$values';
+    }
+    final headers = entries.first.keys.join(',');
+    final rows = entries.map((e) => e.values.map(_csvCell).join(',')).join('\n');
+    return '$headers\n$rows';
+  }
+
+  String _csvCell(dynamic v) {
+    final s = (v ?? '').toString();
+    return s.contains(',') || s.contains('"') || s.contains('\n')
+        ? '"${s.replaceAll('"', '""')}"'
+        : s;
   }
 
   Future<void> _download(String format) async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadingMsg = 'Buscando dados do backup...';
+    });
     try {
-      final content = format == 'json' ? _toJson() : _toCsv();
-      final mimeType =
-          format == 'json' ? 'application/json' : 'text/csv';
+      final entries = await _fetchAllEntries();
+
+      if (mounted) setState(() => _loadingMsg = 'Gerando arquivo...');
+
+      final content =
+          format == 'json' ? _toJson(entries) : _toCsv(entries);
+      final mimeType = format == 'json' ? 'application/json' : 'text/csv';
       final fileName =
           'snapshot_${widget.snapshot.id.substring(0, 8)}_${DateTime.now().millisecondsSinceEpoch}.$format';
 
@@ -261,12 +300,10 @@ class _DownloadSheetState extends State<_DownloadSheet> {
       if (!mounted) return;
       Navigator.pop(context);
 
-      final shareResult = await Share.shareXFiles(
+      await Share.shareXFiles(
         [XFile(file.path, mimeType: mimeType)],
         subject: 'Phoenix Backup - ${widget.snapshot.name}',
       );
-
-      if (shareResult.status == ShareResultStatus.dismissed) return;
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -301,11 +338,12 @@ class _DownloadSheetState extends State<_DownloadSheet> {
                     fontWeight: FontWeight.w700),
               ),
               const Spacer(),
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: const Icon(Icons.close_rounded,
-                    color: AppColors.textSecondary, size: 20),
-              ),
+              if (!_loading)
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: const Icon(Icons.close_rounded,
+                      color: AppColors.textSecondary, size: 20),
+                ),
             ],
           ),
           const SizedBox(height: 6),
@@ -316,10 +354,18 @@ class _DownloadSheetState extends State<_DownloadSheet> {
           ),
           const SizedBox(height: 20),
           if (_loading)
-            const Center(
+            Center(
               child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: CircularProgressIndicator(color: AppColors.primary),
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Column(
+                  children: [
+                    const CircularProgressIndicator(color: AppColors.primary),
+                    const SizedBox(height: 14),
+                    Text(_loadingMsg,
+                        style: const TextStyle(
+                            color: AppColors.textSecondary, fontSize: 13)),
+                  ],
+                ),
               ),
             )
           else ..._formatOptions(),
@@ -332,7 +378,8 @@ class _DownloadSheetState extends State<_DownloadSheet> {
         _FormatTile(
           icon: Icons.data_object_rounded,
           label: 'JSON',
-          description: 'Formato estruturado, ideal para integração',
+          description:
+              'Metadados + todas as entradas do backup',
           color: const Color(0xFF3b82f6),
           onTap: () => _download('json'),
         ),
@@ -340,7 +387,7 @@ class _DownloadSheetState extends State<_DownloadSheet> {
         _FormatTile(
           icon: Icons.table_chart_rounded,
           label: 'CSV',
-          description: 'Planilha compatível com Excel / Google Sheets',
+          description: 'Entradas como tabela — Excel / Google Sheets',
           color: const Color(0xFF22c55e),
           onTap: () => _download('csv'),
         ),
@@ -581,7 +628,8 @@ class _BackupRow extends StatelessWidget {
                 const SizedBox(width: 6),
                 _IconBtn(Icons.restore_rounded, AppColors.primary, onRestore),
                 const SizedBox(width: 6),
-                _IconBtn(Icons.download_outlined, AppColors.primary, onDownload),
+                _IconBtn(
+                    Icons.download_outlined, AppColors.primary, onDownload),
               ],
             ),
           ),
