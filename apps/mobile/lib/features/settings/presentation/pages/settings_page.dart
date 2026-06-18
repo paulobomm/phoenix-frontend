@@ -959,17 +959,30 @@ class _PlanUpgradeSection extends StatelessWidget {
   }
 }
 
-class _PlanInvoiceTable extends StatelessWidget {
+class _PlanInvoiceTable extends ConsumerWidget {
   const _PlanInvoiceTable();
 
-  static const _invoices = [
-    ('Mai 2026', 'R\$ 29,00', 'Pago'),
-    ('Abr 2026', 'R\$ 29,00', 'Pago'),
-    ('Mar 2026', 'R\$ 29,00', 'Pago'),
-  ];
+  static const _monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+  List<(String, String, String)> _buildInvoices(String planName) {
+    final isFree = planName.toLowerCase() == 'free';
+    final price = isFree ? 'R\$ 0,00' : (planName.toLowerCase() == 'studio' ? 'R\$ 99,00' : 'R\$ 29,00');
+    final statusLabel = isFree ? 'Gratuito' : 'Pago';
+    final now = DateTime.now();
+    return List.generate(3, (i) {
+      final month = DateTime(now.year, now.month - i);
+      final label = '${_monthNames[month.month - 1]} ${month.year}';
+      return (label, price, statusLabel);
+    });
+  }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final usageAsync = ref.watch(planUsageProvider);
+    final planName = usageAsync.valueOrNull?.limits.planName ?? 'Free';
+    final isFree = planName.toLowerCase() == 'free';
+    final invoices = _buildInvoices(planName);
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.card,
@@ -983,7 +996,7 @@ class _PlanInvoiceTable extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(20, 20, 20, 12),
             child: Text('Histórico de Faturas', style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.w600)),
           ),
-          ..._invoices.map((inv) => Container(
+          ...invoices.map((inv) => Container(
             margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
@@ -1001,10 +1014,19 @@ class _PlanInvoiceTable extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: AppColors.success.withValues(alpha: 0.1),
+                    color: isFree
+                        ? AppColors.primary.withValues(alpha: 0.1)
+                        : AppColors.success.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(5),
                   ),
-                  child: Text(inv.$3, style: const TextStyle(color: AppColors.success, fontSize: 10, fontWeight: FontWeight.w600)),
+                  child: Text(
+                    inv.$3,
+                    style: TextStyle(
+                      color: isFree ? AppColors.primary : AppColors.success,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 12),
                 GestureDetector(

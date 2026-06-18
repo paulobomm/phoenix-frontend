@@ -11,8 +11,9 @@ final snapshotsRepositoryProvider = Provider<SnapshotsRepository>((ref) {
 final snapshotsProvider =
     FutureProvider.autoDispose<List<SnapshotModel>>((ref) async {
   final selectedGame = ref.watch(selectedGameProvider);
+  if (selectedGame == null) return [];
   final repo = ref.read(snapshotsRepositoryProvider);
-  return repo.getSnapshots(selectedGame?.id ?? '');
+  return repo.getSnapshots(selectedGame.id);
 });
 
 // Per-project snapshot count — used by game cards
