@@ -12,9 +12,11 @@ class GameSelectorWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedGame = ref.watch(selectedGameProvider);
     final gamesAsync = ref.watch(gamesProvider);
+    final games = gamesAsync.valueOrNull ?? [];
+    final hasGames = games.isNotEmpty;
 
     return GestureDetector(
-      onTap: () => _showGameSelector(context, ref, gamesAsync.valueOrNull ?? []),
+      onTap: hasGames ? () => _showGameSelector(context, ref, games) : null,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -41,15 +43,15 @@ class GameSelectorWidget extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    selectedGame?.name ?? 'Selecionar Jogo',
-                    style: const TextStyle(
-                      color: AppColors.text,
+                    hasGames ? (selectedGame?.name ?? 'Selecionar Jogo') : 'Nenhum jogo cadastrado',
+                    style: TextStyle(
+                      color: hasGames ? AppColors.text : AppColors.textSecondary,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (selectedGame != null)
+                  if (selectedGame != null && hasGames)
                     Text(
                       'Universe ID: ${selectedGame.universeId}',
                       style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
@@ -57,25 +59,28 @@ class GameSelectorWidget extends ConsumerWidget {
                 ],
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: selectedGame?.isActive == true
-                    ? AppColors.success.withValues(alpha: 0.15)
-                    : AppColors.warning.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                selectedGame?.isActive == true ? 'Ativo' : 'Pausado',
-                style: TextStyle(
-                  color: selectedGame?.isActive == true ? AppColors.success : AppColors.warning,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
+            if (selectedGame != null && hasGames) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                decoration: BoxDecoration(
+                  color: selectedGame.isActive
+                      ? AppColors.success.withValues(alpha: 0.15)
+                      : AppColors.warning.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  selectedGame.isActive ? 'Ativo' : 'Pausado',
+                  style: TextStyle(
+                    color: selectedGame.isActive ? AppColors.success : AppColors.warning,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 6),
-            const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary, size: 20),
+              const SizedBox(width: 6),
+            ],
+            if (hasGames)
+              const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary, size: 20),
           ],
         ),
       ),
