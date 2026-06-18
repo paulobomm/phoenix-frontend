@@ -33,9 +33,8 @@ class _SnapshotsPageState extends ConsumerState<SnapshotsPage> {
   }
 
   void _schedulePollingIfNeeded(List<SnapshotModel> snapshots) {
-    final hasRunning = snapshots.any(
-      (s) => s.status == 'running' || s.status == 'pending',
-    );
+    const terminalStatuses = {'completed', 'failed'};
+    final hasRunning = snapshots.any((s) => !terminalStatuses.contains(s.status));
     if (hasRunning && _pollingTimer == null) {
       _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
         if (mounted) ref.invalidate(snapshotsProvider);
@@ -555,7 +554,7 @@ class _BackupRow extends StatelessWidget {
     final status = snapshot.status;
     final isComplete = status == 'completed';
     final isFailed = status == 'failed';
-    final isRunning = status == 'running' || status == 'pending';
+    final isRunning = status == 'running' || status == 'pending' || status == 'scheduled';
 
     Color statusColor;
     String statusLabel;
