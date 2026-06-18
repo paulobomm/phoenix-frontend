@@ -21,6 +21,8 @@ class DashboardPage extends ConsumerWidget {
     final logsAsync = ref.watch(logsProvider);
     final gamesAsync = ref.watch(gamesProvider);
 
+    final hasGames = (gamesAsync.valueOrNull?.isNotEmpty) ?? true;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -45,17 +47,11 @@ class DashboardPage extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  Container(
+                  Image.asset(
+                    'assets/images/phoenix_logo.png',
                     width: 36,
                     height: 36,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                        Icons.local_fire_department_rounded,
-                        color: AppColors.primary,
-                        size: 20),
+                    fit: BoxFit.contain,
                   ),
                 ],
               ),
@@ -136,21 +132,26 @@ class DashboardPage extends ConsumerWidget {
                     chartAsync.when(
                       loading: () => const SkeletonCard(),
                       error: (e, _) => const SizedBox.shrink(),
-                      data: (points) => BackupChartWidget(points: points),
+                      data: (points) => BackupChartWidget(
+                        points: hasGames ? points : [],
+                      ),
                     ),
                     const SizedBox(height: 16),
 
                     // --- Insights ---
-                    insightsAsync.when(
-                      loading: () => const SkeletonCard(),
-                      error: (e, _) => const SizedBox.shrink(),
-                      data: (insights) => InsightsWidget(insights: insights),
-                    ),
-                    const SizedBox(height: 16),
+                    if (hasGames)
+                      insightsAsync.when(
+                        loading: () => const SkeletonCard(),
+                        error: (e, _) => const SizedBox.shrink(),
+                        data: (insights) => InsightsWidget(insights: insights),
+                      ),
+                    if (hasGames) const SizedBox(height: 16),
 
                     // --- Atividade Recente ---
                     _RecentActivity(
-                      logs: logsAsync.valueOrNull?.take(5).toList() ?? [],
+                      logs: hasGames
+                          ? (logsAsync.valueOrNull?.take(5).toList() ?? [])
+                          : [],
                     ),
                     const SizedBox(height: 24),
                   ],
