@@ -16,6 +16,7 @@ class DashboardPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(dashboardStatsProvider);
+    final realStatsAsync = ref.watch(realSnapshotStatsProvider);
     final chartAsync = ref.watch(chartDataProvider);
     final insightsAsync = ref.watch(insightsProvider);
     final logsAsync = ref.watch(logsProvider);
@@ -62,6 +63,7 @@ class DashboardPage extends ConsumerWidget {
                 backgroundColor: AppColors.card,
                 onRefresh: () async {
                   ref.invalidate(dashboardStatsProvider);
+                  ref.invalidate(realSnapshotStatsProvider);
                   ref.invalidate(chartDataProvider);
                   ref.invalidate(insightsProvider);
                   ref.invalidate(logsProvider);
@@ -88,6 +90,10 @@ class DashboardPage extends ConsumerWidget {
                           style: const TextStyle(color: AppColors.error)),
                       data: (stats) {
                         final gameCount = gamesAsync.valueOrNull?.length ?? stats.totalGames;
+                        final realStats = realStatsAsync.valueOrNull;
+                        final backupCount = realStats?.totalBackups ?? stats.totalBackups;
+                        final storage = realStats?.formattedStorage ?? '${stats.storageUsedGb.toStringAsFixed(1)} GB';
+                        final successRate = realStats?.successRate ?? stats.successRate;
                         return Column(children: [
                           Row(children: [
                             Expanded(child: StatsCard(
@@ -99,7 +105,7 @@ class DashboardPage extends ConsumerWidget {
                             const SizedBox(width: 8),
                             Expanded(child: StatsCard(
                               title: 'Total de Backups',
-                              value: '${stats.totalBackups}',
+                              value: '$backupCount',
                               icon: Icons.cloud_done_rounded,
                               iconColor: const Color(0xFF60A5FA),
                             )),
@@ -108,15 +114,14 @@ class DashboardPage extends ConsumerWidget {
                           Row(children: [
                             Expanded(child: StatsCard(
                               title: 'Storage Usado',
-                              value: '${stats.storageUsedGb.toStringAsFixed(1)} GB',
-                              subtitle: 'de 50 GB',
+                              value: storage,
                               icon: Icons.storage_rounded,
                               iconColor: AppColors.warning,
                             )),
                             const SizedBox(width: 8),
                             Expanded(child: StatsCard(
                               title: 'Taxa de Sucesso',
-                              value: '${stats.successRate.toStringAsFixed(0)}%',
+                              value: '${successRate.toStringAsFixed(0)}%',
                               subtitle: 'últimos 30 dias',
                               icon: Icons.verified_rounded,
                               iconColor: AppColors.success,
@@ -173,6 +178,51 @@ class _RecentActivity extends StatelessWidget {
   final List<LogModel> logs;
   const _RecentActivity({required this.logs});
 
+  static const _eventLabels = {
+    'project.archived': 'Projeto arquivado',
+    'project.created': 'Projeto criado',
+    'project.deleted': 'Projeto deletado',
+    'project.updated': 'Projeto atualizado',
+    'project.restored': 'Projeto restaurado',
+    'job.scheduled': 'Backup agendado',
+    'job.started': 'Backup iniciado',
+    'job.completed': 'Backup concluído',
+    'job.failed': 'Backup falhou',
+    'job.cancelled': 'Backup cancelado',
+    'restore.started': 'Restore iniciado',
+    'restore.completed': 'Restore concluído',
+    'restore.failed': 'Restore falhou',
+    'snapshot.created': 'Snapshot criado',
+    'snapshot.completed': 'Snapshot concluído',
+    'snapshot.failed': 'Snapshot falhou',
+    'datastore.synced': 'DataStore sincronizado',
+    'datastore.discovered': 'DataStore descoberto',
+    'user.login': 'Login realizado',
+    'schedule.created': 'Agendamento criado',
+    'schedule.updated': 'Agendamento atualizado',
+    'schedule.deleted': 'Agendamento removido',
+    'anomaly.detected': 'Anomalia detectada',
+    'corruption.detected': 'Corrupção detectada',
+    'excess.keys': 'Excesso de keys detectado',
+  };
+
+  String _labelFor(LogModel log) {
+    final key = log.eventType.toLowerCase().replaceAll(' ', '.');
+    if (_eventLabels.containsKey(key)) return _eventLabels[key]!;
+    final lower = log.eventType.toLowerCase();
+    if (lower.contains('backup') && lower.contains('complet')) return 'Backup concluído';
+    if (lower.contains('backup') && lower.contains('fail')) return 'Backup falhou';
+    if (lower.contains('restore')) return 'Restore realizado';
+    if (lower.contains('schedul')) return 'Backup agendado';
+    if (lower.contains('snapshot')) return 'Snapshot criado';
+    return log.eventType
+        .replaceAll('.', ' ')
+        .replaceAll('_', ' ')
+        .split(' ')
+        .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+        .join(' ');
+  }
+
   String _timeAgo(DateTime dt) {
     final diff = DateTime.now().difference(dt);
     if (diff.inMinutes < 60) return '${diff.inMinutes}min atrás';
@@ -182,23 +232,15 @@ class _RecentActivity extends StatelessWidget {
 
   Color _dotColor(LogModel log) {
     final key = log.routingKey.toLowerCase();
-    if (key.contains('fail') || key.contains('error') || key.contains('corrupt')) {
-      return AppColors.error;
-    }
-    if (key.contains('warn') || key.contains('anomal') || key.contains('excess')) {
-      return AppColors.warning;
-    }
+    if (key.contains('fail') || key.contains('error') || key.contains('corrupt')) return AppColors.error;
+    if (key.contains('warn') || key.contains('anomal') || key.contains('excess')) return AppColors.warning;
     return AppColors.success;
   }
 
   IconData _icon(LogModel log) {
     final key = log.routingKey.toLowerCase();
-    if (key.contains('fail') || key.contains('error') || key.contains('corrupt')) {
-      return Icons.cancel_outlined;
-    }
-    if (key.contains('warn') || key.contains('anomal') || key.contains('excess')) {
-      return Icons.warning_amber_rounded;
-    }
+    if (key.contains('fail') || key.contains('error') || key.contains('corrupt')) return Icons.cancel_outlined;
+    if (key.contains('warn') || key.contains('anomal') || key.contains('excess')) return Icons.warning_amber_rounded;
     return Icons.check_circle_outline_rounded;
   }
 
@@ -214,10 +256,7 @@ class _RecentActivity extends StatelessWidget {
             Icon(Icons.history_rounded, color: AppColors.primary, size: 18),
             SizedBox(width: 8),
             Text('Atividade Recente',
-                style: TextStyle(
-                    color: AppColors.text,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700)),
+                style: TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w700)),
           ],
         ),
         const SizedBox(height: 10),
@@ -229,12 +268,17 @@ class _RecentActivity extends StatelessWidget {
           ),
           child: Column(
             children: [
-              for (int i = 0; i < logs.length; i++) ...
-                [
-                  _LogTile(log: logs[i], dotColor: _dotColor(logs[i]), icon: _icon(logs[i]), timeAgo: _timeAgo(logs[i].occurredAt)),
-                  if (i < logs.length - 1)
-                    const Divider(height: 1, color: AppColors.border, indent: 14, endIndent: 14),
-                ],
+              for (int i = 0; i < logs.length; i++) ...[
+                _LogTile(
+                  log: logs[i],
+                  title: _labelFor(logs[i]),
+                  dotColor: _dotColor(logs[i]),
+                  icon: _icon(logs[i]),
+                  timeAgo: _timeAgo(logs[i].occurredAt),
+                ),
+                if (i < logs.length - 1)
+                  const Divider(height: 1, color: AppColors.border, indent: 14, endIndent: 14),
+              ],
             ],
           ),
         ),
@@ -245,12 +289,14 @@ class _RecentActivity extends StatelessWidget {
 
 class _LogTile extends StatelessWidget {
   final LogModel log;
+  final String title;
   final Color dotColor;
   final IconData icon;
   final String timeAgo;
 
   const _LogTile({
     required this.log,
+    required this.title,
     required this.dotColor,
     required this.icon,
     required this.timeAgo,
@@ -272,18 +318,13 @@ class _LogTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  log.eventType,
-                  style: const TextStyle(
-                      color: AppColors.text,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600),
-                ),
+                Text(title,
+                    style: const TextStyle(
+                        color: AppColors.text, fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 2),
                 Text(
-                  log.exchange.isNotEmpty ? log.exchange : log.routingKey,
-                  style: const TextStyle(
-                      color: AppColors.textSecondary, fontSize: 12),
+                  log.routingKey,
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -291,11 +332,7 @@ class _LogTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Text(
-            timeAgo,
-            style: const TextStyle(
-                color: AppColors.textSecondary, fontSize: 11),
-          ),
+          Text(timeAgo, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
         ],
       ),
     );

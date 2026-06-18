@@ -259,9 +259,17 @@ class _ProfileTab extends ConsumerStatefulWidget {
 }
 
 class _ProfileTabState extends ConsumerState<_ProfileTab> {
-  final _nameCtrl = TextEditingController(text: 'Paulo Roberto');
-  final _emailCtrl = TextEditingController(text: 'paulobomm@gmail.com');
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _emailCtrl;
   bool _saving = false;
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController();
+    _emailCtrl = TextEditingController();
+  }
 
   @override
   void dispose() {
@@ -270,8 +278,24 @@ class _ProfileTabState extends ConsumerState<_ProfileTab> {
     super.dispose();
   }
 
+  void _initFromUser() {
+    if (_initialized) return;
+    final user = ref.read(authProvider).user;
+    if (user != null) {
+      _nameCtrl.text = user.name;
+      _emailCtrl.text = user.email;
+      _initialized = true;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(authProvider).user;
+    _initFromUser();
+
+    final planName = user?.plan ?? 'básico';
+    final planLabel = 'Plano ${planName[0].toUpperCase()}${planName.substring(1)}';
+
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -306,9 +330,9 @@ class _ProfileTabState extends ConsumerState<_ProfileTab> {
           ),
         ),
         const SizedBox(height: 8),
-        const Center(
-          child: Text('Plano Pro',
-              style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w600)),
+        Center(
+          child: Text(planLabel,
+              style: const TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w600)),
         ),
         const SizedBox(height: 24),
         PhoenixTextField(label: 'Nome', controller: _nameCtrl),
@@ -701,9 +725,11 @@ class _PlanCurrentCard extends StatelessWidget {
 
   String _planPrice(String planName) {
     switch (planName.toLowerCase()) {
-      case 'pro': return 'R\$ 29,00 / mês';
       case 'studio': return 'R\$ 99,00 / mês';
-      default: return 'Gratuito';
+      case 'pro': return 'R\$ 29,00 / mês';
+      case 'básico':
+      case 'basico': return 'R\$ 9,90 / mês';
+      default: return 'R\$ 9,90 / mês';
     }
   }
 
@@ -965,22 +991,24 @@ class _PlanInvoiceTable extends ConsumerWidget {
   static const _monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
   List<(String, String, String)> _buildInvoices(String planName) {
-    final isFree = planName.toLowerCase() == 'free';
-    final price = isFree ? 'R\$ 0,00' : (planName.toLowerCase() == 'studio' ? 'R\$ 99,00' : 'R\$ 29,00');
-    final statusLabel = isFree ? 'Gratuito' : 'Pago';
+    final String price;
+    switch (planName.toLowerCase()) {
+      case 'studio': price = 'R\$ 99,00'; break;
+      case 'pro': price = 'R\$ 29,00'; break;
+      default: price = 'R\$ 9,90';
+    }
     final now = DateTime.now();
     return List.generate(3, (i) {
       final month = DateTime(now.year, now.month - i);
       final label = '${_monthNames[month.month - 1]} ${month.year}';
-      return (label, price, statusLabel);
+      return (label, price, 'Pago');
     });
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final usageAsync = ref.watch(planUsageProvider);
-    final planName = usageAsync.valueOrNull?.limits.planName ?? 'Free';
-    final isFree = planName.toLowerCase() == 'free';
+    final planName = usageAsync.valueOrNull?.limits.planName ?? 'Básico';
     final invoices = _buildInvoices(planName);
 
     return Container(
@@ -1014,15 +1042,13 @@ class _PlanInvoiceTable extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: isFree
-                        ? AppColors.primary.withValues(alpha: 0.1)
-                        : AppColors.success.withValues(alpha: 0.1),
+                    color: AppColors.success.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(5),
                   ),
                   child: Text(
                     inv.$3,
-                    style: TextStyle(
-                      color: isFree ? AppColors.primary : AppColors.success,
+                    style: const TextStyle(
+                      color: AppColors.success,
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                     ),

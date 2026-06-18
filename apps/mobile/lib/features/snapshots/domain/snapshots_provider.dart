@@ -37,3 +37,30 @@ final schedulesProvider =
   final repo = ref.read(snapshotsRepositoryProvider);
   return repo.listSchedules(selectedGame?.id ?? '');
 });
+
+class ProjectStorageSummary {
+  final int totalBackups;
+  final double sizeGb;
+  const ProjectStorageSummary({required this.totalBackups, required this.sizeGb});
+
+  String get formattedSize {
+    if (sizeGb <= 0) return '0 MB';
+    if (sizeGb < 1) return '${(sizeGb * 1024).toStringAsFixed(1)} MB';
+    return '${sizeGb.toStringAsFixed(2)} GB';
+  }
+}
+
+final projectStorageSummaryProvider =
+    FutureProvider.autoDispose.family<ProjectStorageSummary, String>((ref, projectId) async {
+  if (projectId.isEmpty) return const ProjectStorageSummary(totalBackups: 0, sizeGb: 0);
+  final repo = ref.read(snapshotsRepositoryProvider);
+  final snapshots = await repo.getSnapshots(projectId);
+  double totalBytes = 0;
+  for (final s in snapshots) {
+    if (s.status == 'completed') totalBytes += s.sizeBytes ?? 0;
+  }
+  return ProjectStorageSummary(
+    totalBackups: snapshots.length,
+    sizeGb: totalBytes / (1024 * 1024 * 1024),
+  );
+});
