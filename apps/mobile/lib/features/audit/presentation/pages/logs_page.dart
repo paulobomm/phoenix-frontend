@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/empty_state_widget.dart';
 import '../../../../shared/widgets/skeleton_loader.dart';
+import '../../data/models/log_model.dart';
 import '../../domain/audit_provider.dart';
 
 class LogsPage extends ConsumerStatefulWidget {
@@ -20,7 +21,6 @@ class _LogsPageState extends ConsumerState<LogsPage> {
     'backup': 'Backup',
     'restore': 'Restore',
     'error': 'Erros',
-    'warning': 'Avisos',
   };
 
   @override
@@ -107,13 +107,11 @@ class _LogsPageState extends ConsumerState<LogsPage> {
                 data: (logs) {
                   var filtered = logs;
                   if (_filter == 'error') {
-                    filtered = logs.where((l) => l.status == 'error').toList();
-                  } else if (_filter == 'warning') {
-                    filtered = logs.where((l) => l.status == 'warning').toList();
+                    filtered = logs.where((l) => l.eventType.toLowerCase().contains('error') || l.eventType.toLowerCase().contains('fail')).toList();
                   } else if (_filter == 'backup') {
-                    filtered = logs.where((l) => l.action.contains('backup')).toList();
+                    filtered = logs.where((l) => l.eventType.toLowerCase().contains('backup') || l.routingKey.toLowerCase().contains('backup')).toList();
                   } else if (_filter == 'restore') {
-                    filtered = logs.where((l) => l.action.contains('restore')).toList();
+                    filtered = logs.where((l) => l.eventType.toLowerCase().contains('restore') || l.routingKey.toLowerCase().contains('restore')).toList();
                   }
 
                   if (filtered.isEmpty) {
@@ -130,10 +128,7 @@ class _LogsPageState extends ConsumerState<LogsPage> {
                     itemBuilder: (context, i) {
                       final log = filtered[i];
                       final isLast = i == filtered.length - 1;
-                      return _TimelineItem(
-                        log: log,
-                        isLast: isLast,
-                      );
+                      return _TimelineItem(log: log, isLast: isLast);
                     },
                   );
                 },
@@ -147,16 +142,14 @@ class _LogsPageState extends ConsumerState<LogsPage> {
 }
 
 class _TimelineItem extends StatelessWidget {
-  final dynamic log;
+  final LogModel log;
   final bool isLast;
 
   const _TimelineItem({required this.log, required this.isLast});
 
   _LogMeta _getMeta() {
-    final action = log.action as String;
-    final status = log.status as String;
-
-    if (action.contains('backup')) {
+    final et = log.eventType.toLowerCase();
+    if (et.contains('backup') || log.routingKey.toLowerCase().contains('backup')) {
       return const _LogMeta(
         icon: Icons.cloud_upload_outlined,
         dotColor: AppColors.primary,
@@ -165,7 +158,7 @@ class _TimelineItem extends StatelessWidget {
         badgeColor: AppColors.primary,
       );
     }
-    if (action.contains('restore')) {
+    if (et.contains('restore') || log.routingKey.toLowerCase().contains('restore')) {
       return const _LogMeta(
         icon: Icons.restore_rounded,
         dotColor: AppColors.warning,
@@ -174,31 +167,22 @@ class _TimelineItem extends StatelessWidget {
         badgeColor: AppColors.warning,
       );
     }
-    if (action.contains('login') || action.contains('auth')) {
-      return const _LogMeta(
-        icon: Icons.login_rounded,
-        dotColor: AppColors.textSecondary,
-        iconColor: AppColors.textSecondary,
-        badge: 'Login',
-        badgeColor: AppColors.textSecondary,
-      );
-    }
-    if (action.contains('game') || action.contains('jogo')) {
-      return const _LogMeta(
-        icon: Icons.videogame_asset_outlined,
-        dotColor: AppColors.success,
-        iconColor: AppColors.success,
-        badge: 'Jogo Adicionado',
-        badgeColor: AppColors.success,
-      );
-    }
-    if (status == 'error') {
+    if (et.contains('error') || et.contains('fail')) {
       return const _LogMeta(
         icon: Icons.error_outline_rounded,
         dotColor: AppColors.error,
         iconColor: AppColors.error,
         badge: 'Erro',
         badgeColor: AppColors.error,
+      );
+    }
+    if (et.contains('login') || et.contains('auth')) {
+      return const _LogMeta(
+        icon: Icons.login_rounded,
+        dotColor: AppColors.textSecondary,
+        iconColor: AppColors.textSecondary,
+        badge: 'Login',
+        badgeColor: AppColors.textSecondary,
       );
     }
     return const _LogMeta(
@@ -216,6 +200,18 @@ class _TimelineItem extends StatelessWidget {
     if (diff.inMinutes < 60) return 'Há ${diff.inMinutes}min';
     if (diff.inHours < 24) return 'Há ${diff.inHours}h';
     return 'Há ${diff.inDays}d';
+  }
+
+  String get _label {
+    final et = log.eventType;
+    return et.isNotEmpty ? et : log.routingKey;
+  }
+
+  String get _detail {
+    if (log.routingKey.isNotEmpty && log.exchange.isNotEmpty) {
+      return '${log.exchange} › ${log.routingKey}';
+    }
+    return log.routingKey.isNotEmpty ? log.routingKey : log.exchange;
   }
 
   @override
@@ -278,29 +274,19 @@ class _TimelineItem extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          (log.action as String)
-                              .replaceAll('.', ' ')
-                              .replaceAll('_', ' ')
-                              .split(' ')
-                              .map((w) => w.isNotEmpty
-                                  ? '${w[0].toUpperCase()}${w.substring(1)}'
-                                  : w)
-                              .join(' '),
-                          style: const TextStyle(
-                              color: AppColors.text,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13),
+                          _label.replaceAll('.', ' ').replaceAll('_', ' ').split(' ').map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : w).join(' '),
+                          style: const TextStyle(color: AppColors.text, fontWeight: FontWeight.w600, fontSize: 13),
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          log.details as String,
+                          _detail,
                           style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          _formatTime(log.timestamp as DateTime),
+                          _formatTime(log.occurredAt),
                           style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                         ),
                       ],
@@ -316,8 +302,7 @@ class _TimelineItem extends StatelessWidget {
                     ),
                     child: Text(
                       meta.badge,
-                      style: TextStyle(
-                          color: meta.badgeColor, fontSize: 10, fontWeight: FontWeight.w600),
+                      style: TextStyle(color: meta.badgeColor, fontSize: 10, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ],

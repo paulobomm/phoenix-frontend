@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/skeleton_loader.dart';
-import '../../../games/presentation/widgets/game_selector_widget.dart';
 import '../../../audit/domain/audit_provider.dart';
+import '../../../games/domain/games_provider.dart';
 import '../../domain/dashboard_provider.dart';
 import '../widgets/stats_card.dart';
 import '../widgets/backup_chart_widget.dart';
@@ -18,6 +18,8 @@ class DashboardPage extends ConsumerWidget {
     final statsAsync = ref.watch(dashboardStatsProvider);
     final chartAsync = ref.watch(chartDataProvider);
     final insightsAsync = ref.watch(insightsProvider);
+    final gamesAsync = ref.watch(gamesProvider);
+    final logsAsync = ref.watch(logsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -25,7 +27,7 @@ class DashboardPage extends ConsumerWidget {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
               child: Row(
                 children: [
                   const Expanded(
@@ -49,7 +51,6 @@ class DashboardPage extends ConsumerWidget {
                 ],
               ),
             ),
-            const GameSelectorWidget(),
             Expanded(
               child: RefreshIndicator(
                 color: AppColors.primary,
@@ -58,11 +59,12 @@ class DashboardPage extends ConsumerWidget {
                   ref.invalidate(dashboardStatsProvider);
                   ref.invalidate(chartDataProvider);
                   ref.invalidate(insightsProvider);
+                  ref.invalidate(logsProvider);
                 },
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   children: [
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     statsAsync.when(
                       loading: () => const Column(
                         children: [
@@ -85,7 +87,7 @@ class DashboardPage extends ConsumerWidget {
                           Row(children: [
                             Expanded(child: StatsCard(
                               title: 'Total de Jogos',
-                              value: '${stats.totalGames}',
+                              value: '${gamesAsync.valueOrNull?.length ?? stats.totalGames}',
                               icon: Icons.videogame_asset_rounded,
                               iconColor: AppColors.primary,
                             )),
@@ -129,11 +131,11 @@ class DashboardPage extends ConsumerWidget {
                     insightsAsync.when(
                       loading: () => const SkeletonCard(),
                       error: (e, _) => const SizedBox.shrink(),
-                      data: (insights) => InsightsWidget(insights: insights),
+                      data: (insights) => insights.isEmpty ? const SizedBox.shrink() : InsightsWidget(insights: insights),
                     ),
                     const SizedBox(height: 16),
                     RecentActivityWidget(
-                      logs: ref.watch(logsProvider).valueOrNull?.take(5).toList() ?? [],
+                      logs: logsAsync.valueOrNull?.take(5).toList() ?? [],
                     ),
                     const SizedBox(height: 24),
                   ],

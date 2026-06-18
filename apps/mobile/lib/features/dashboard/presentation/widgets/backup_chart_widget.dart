@@ -10,13 +10,16 @@ class BackupChartWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (points.isEmpty) return const SizedBox.shrink();
+    final effectivePoints = points.isEmpty
+        ? List.generate(30, (i) => BackupChartPoint(date: DateTime.now().subtract(Duration(days: 29 - i)), count: 0))
+        : points;
 
-    final spots = points.asMap().entries.map((e) {
+    final spots = effectivePoints.asMap().entries.map((e) {
       return FlSpot(e.key.toDouble(), e.value.count.toDouble());
     }).toList();
 
-    final maxY = (points.map((p) => p.count).reduce((a, b) => a > b ? a : b) + 2).toDouble();
+    final maxCount = effectivePoints.map((p) => p.count).fold(0, (a, b) => a > b ? a : b);
+    final maxY = (maxCount + 2).toDouble();
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -69,7 +72,7 @@ class BackupChartWidget extends StatelessWidget {
                 ),
                 borderData: FlBorderData(show: false),
                 minX: 0,
-                maxX: (spots.length - 1).toDouble(),
+                maxX: (spots.length - 1).toDouble().clamp(1, double.infinity),
                 minY: 0,
                 maxY: maxY,
                 lineBarsData: [
