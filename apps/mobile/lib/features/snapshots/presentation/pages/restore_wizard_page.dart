@@ -1,38 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/phoenix_button.dart';
+import '../../data/models/snapshot_model.dart';
+import '../../domain/snapshots_provider.dart';
 
-class RestoreWizardPage extends StatefulWidget {
+class RestoreWizardPage extends ConsumerStatefulWidget {
   final String? snapshotId;
   const RestoreWizardPage({super.key, this.snapshotId});
 
   @override
-  State<RestoreWizardPage> createState() => _RestoreWizardPageState();
+  ConsumerState<RestoreWizardPage> createState() => _RestoreWizardPageState();
 }
 
-class _RestoreWizardPageState extends State<RestoreWizardPage> {
+class _RestoreWizardPageState extends ConsumerState<RestoreWizardPage> {
   int _step = 0;
-  String _selectedSnapshot = '';
+  SnapshotModel? _selectedSnapshot;
   String _scope = 'full';
+  String _destino = 'same';
   double _progress = 0;
   final List<String> _logs = [];
-  bool _restoreComplete = false;
 
   static const _steps = ['Origem', 'Destino', 'Confirmação', 'Progresso', 'Conclusão'];
 
-  static const _mockSnapshots = [
-    'Backup Automático — 15 Jan 2024, 14:30',
-    'Backup Manual — 13 Jan 2024, 10:15',
-    'Backup Automático — 12 Jan 2024, 14:30',
-  ];
+  String _formatDate(DateTime dt) {
+    final months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year}, ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
 
-  @override
-  void initState() {
-    super.initState();
-    if (widget.snapshotId != null) {
-      _selectedSnapshot = _mockSnapshots.first;
-    }
+  String _snapshotLabel(SnapshotModel s) {
+    final kind = s.snapshotType == 'manual' ? 'Manual' : 'Automático';
+    return '$kind — ${_formatDate(s.createdAt)}';
+  }
+
+  String _formatSize(int? bytes) {
+    if (bytes == null || bytes <= 0) return '—';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 
   Future<void> _startRestore() async {
@@ -64,10 +70,7 @@ class _RestoreWizardPageState extends State<RestoreWizardPage> {
 
     if (mounted) {
       await Future.delayed(const Duration(milliseconds: 600));
-      setState(() {
-        _step = 4;
-        _restoreComplete = true;
-      });
+      setState(() => _step = 4);
     }
   }
 
@@ -102,22 +105,18 @@ class _RestoreWizardPageState extends State<RestoreWizardPage> {
 
   Widget _buildStep() {
     switch (_step) {
-      case 0:
-        return _buildOrigem();
-      case 1:
-        return _buildDestino();
-      case 2:
-        return _buildConfirmacao();
-      case 3:
-        return _buildProgresso();
-      case 4:
-        return _buildConclusao();
-      default:
-        return _buildOrigem();
+      case 0: return _buildOrigem();
+      case 1: return _buildDestino();
+      case 2: return _buildConfirmacao();
+      case 3: return _buildProgresso();
+      case 4: return _buildConclusao();
+      default: return _buildOrigem();
     }
   }
 
   Widget _buildOrigem() {
+    final snapshotsAsync = ref.watch(snapshotsProvider);
+
     return SingleChildScrollView(
       key: const ValueKey('s0'),
       padding: const EdgeInsets.all(24),
@@ -126,76 +125,106 @@ class _RestoreWizardPageState extends State<RestoreWizardPage> {
         children: [
           _sectionHeader('Selecione o snapshot de origem', 'Escolha o backup que deseja restaurar'),
           const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.card,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Snapshot', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500)),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  initialValue: _selectedSnapshot.isEmpty ? null : _selectedSnapshot,
-                  hint: const Text('Selecionar snapshot...', style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
-                  dropdownColor: AppColors.card,
-                  style: const TextStyle(color: AppColors.text, fontSize: 14),
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: AppColors.background,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: AppColors.border),
+          snapshotsAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+            error: (e, _) => Text('Erro ao carregar snapshots: $e', style: const TextStyle(color: AppColors.error)),
+            data: (snapshots) {
+              final completed = snapshots.where((s) => s.status == 'completed').toList()
+                ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+              if (completed.isEmpty) {
+                return Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppColors.card,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: const Center(
+                    child: Text('Nenhum snapshot disponível para restauração.',
+                        style: TextStyle(color: AppColors.textSecondary)),
+                  ),
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.border),
                     ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: AppColors.border),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Snapshot', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500)),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<SnapshotModel>(
+                          value: _selectedSnapshot,
+                          hint: const Text('Selecionar snapshot...', style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                          dropdownColor: AppColors.card,
+                          style: const TextStyle(color: AppColors.text, fontSize: 14),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: AppColors.background,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                          ),
+                          items: completed.map((s) => DropdownMenuItem(
+                            value: s,
+                            child: Text(_snapshotLabel(s), style: const TextStyle(fontSize: 13)),
+                          )).toList(),
+                          onChanged: (v) => setState(() => _selectedSnapshot = v),
+                        ),
+                      ],
                     ),
                   ),
-                  items: _mockSnapshots
-                      .map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 13))))
-                      .toList(),
-                  onChanged: (v) => setState(() => _selectedSnapshot = v ?? ''),
-                ),
-              ],
-            ),
-          ),
-          if (_selectedSnapshot.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.card,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
-                children: [
-                  _infoRow('Criado em', '15 Jan 2024, 14:30'),
-                  const SizedBox(height: 10),
-                  _infoRow('Tamanho', '8.5 MB'),
-                  const SizedBox(height: 10),
-                  _infoRow('Keys', '1.423'),
-                  const SizedBox(height: 10),
-                  _infoRow('Status', 'Completo'),
+                  if (_selectedSnapshot != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.card,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Column(
+                        children: [
+                          _infoRow('Criado em', _formatDate(_selectedSnapshot!.createdAt)),
+                          const SizedBox(height: 10),
+                          _infoRow('Tamanho', _formatSize(_selectedSnapshot!.sizeBytes)),
+                          const SizedBox(height: 10),
+                          _infoRow('Keys', _selectedSnapshot!.keyCount != null ? '${_selectedSnapshot!.keyCount}' : '—'),
+                          const SizedBox(height: 10),
+                          _infoRow('Status', 'Completo'),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Escopo do Restore', style: TextStyle(color: AppColors.text, fontSize: 14, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 12),
+                    _radioOption('full', 'Restore Completo', 'Restaurar todas as keys do snapshot'),
+                    const SizedBox(height: 10),
+                    _radioOption('selective', 'Restore Seletivo', 'Selecionar keys específicas para restaurar'),
+                  ],
                 ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text('Escopo do Restore', style: TextStyle(color: AppColors.text, fontSize: 14, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 12),
-            _radioOption('full', 'Restore Completo', 'Restaurar todas as keys do snapshot'),
-            const SizedBox(height: 10),
-            _radioOption('selective', 'Restore Seletivo', 'Selecionar keys específicas para restaurar'),
-          ],
+              );
+            },
+          ),
           const SizedBox(height: 32),
           PhoenixButton(
             label: 'Próximo →',
-            onPressed: _selectedSnapshot.isEmpty ? null : () => setState(() => _step = 1),
+            onPressed: _selectedSnapshot == null ? null : () => setState(() => _step = 1),
             width: double.infinity,
           ),
         ],
@@ -222,9 +251,8 @@ class _RestoreWizardPageState extends State<RestoreWizardPage> {
     );
   }
 
-  String _destino = 'same';
-
   Widget _buildConfirmacao() {
+    final s = _selectedSnapshot;
     return SingleChildScrollView(
       key: const ValueKey('s2'),
       padding: const EdgeInsets.all(24),
@@ -243,9 +271,9 @@ class _RestoreWizardPageState extends State<RestoreWizardPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _infoRow('Snapshot', _selectedSnapshot.split(' — ').first),
+                _infoRow('Snapshot', s != null ? _snapshotLabel(s).split(' — ').first : '—'),
                 const SizedBox(height: 10),
-                _infoRow('Criado em', _selectedSnapshot.contains('—') ? _selectedSnapshot.split(' — ').last : '—'),
+                _infoRow('Criado em', s != null ? _formatDate(s.createdAt) : '—'),
                 const SizedBox(height: 10),
                 _infoRow('Escopo', _scope == 'full' ? 'Restore Completo' : 'Restore Seletivo'),
                 const SizedBox(height: 10),

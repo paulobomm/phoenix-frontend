@@ -109,7 +109,11 @@ class GameCard extends ConsumerWidget {
                       style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                     ),
                     const SizedBox(height: 4),
-                    const Text('— MB', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                    ref.watch(projectStorageSummaryProvider(game.id)).when(
+                      data: (s) => Text(s.formattedSize, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                      loading: () => const Text('...', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                      error: (_, __) => const Text('— MB', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                    ),
                   ],
                 ),
               ],
