@@ -41,7 +41,7 @@ PlanLimits _limitsForPlan(String plan) {
     case 'pro':
       return const PlanLimits(planName: 'Pro', maxGames: 10, maxStorageGb: 50, maxBackupsPerMonth: 500);
     default:
-      return const PlanLimits(planName: 'Free', maxGames: 4, maxStorageGb: 1, maxBackupsPerMonth: 5);
+      return const PlanLimits(planName: 'Básico', maxGames: 10, maxStorageGb: 5, maxBackupsPerMonth: 99999);
   }
 }
 

@@ -803,6 +803,7 @@ class _PlanCurrentCard extends StatelessWidget {
             used: usage.backupsThisMonth.toDouble(),
             total: limits.maxBackupsPerMonth.toDouble(),
             unit: '',
+            unlimited: limits.maxBackupsPerMonth >= 99999,
           ),
         ],
       ),
@@ -815,12 +816,16 @@ class _PlanBar extends StatelessWidget {
   final double used;
   final double total;
   final String unit;
-  const _PlanBar({required this.label, required this.used, required this.total, required this.unit});
+  final bool unlimited;
+  const _PlanBar({required this.label, required this.used, required this.total, required this.unit, this.unlimited = false});
 
   @override
   Widget build(BuildContext context) {
-    final ratio = (used / total).clamp(0.0, 1.0);
+    final ratio = unlimited ? 0.0 : (used / total).clamp(0.0, 1.0);
     final color = ratio > 0.7 ? AppColors.warning : AppColors.primary;
+    final valueText = unlimited
+        ? '${used.toInt()} / Ilimitado'
+        : (unit.isEmpty ? '${used.toInt()} / ${total.toInt()}' : '${used.toStringAsFixed(1)} / ${total.toStringAsFixed(0)} $unit');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -828,17 +833,14 @@ class _PlanBar extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(label, style: const TextStyle(color: AppColors.text, fontSize: 12)),
-            Text(
-              unit.isEmpty ? '${used.toInt()} / ${total.toInt()}' : '${used.toStringAsFixed(1)} / ${total.toStringAsFixed(0)} $unit',
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-            ),
+            Text(valueText, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
           ],
         ),
         const SizedBox(height: 6),
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
-            value: ratio,
+            value: unlimited ? 0.0 : ratio,
             backgroundColor: Colors.white.withValues(alpha: 0.1),
             valueColor: AlwaysStoppedAnimation<Color>(color),
             minHeight: 5,
@@ -888,7 +890,7 @@ class _PlanUsageCard extends StatelessWidget {
           const SizedBox(height: 12),
           _PlanStat('Storage utilizado', _formatStorage(usage.storageUsedGb), AppColors.warning),
           const SizedBox(height: 12),
-          _PlanStat('Backups este mês', '${usage.backupsThisMonth} / ${limits.maxBackupsPerMonth}', AppColors.success),
+          _PlanStat('Backups este mês', limits.maxBackupsPerMonth >= 99999 ? '${usage.backupsThisMonth} / Ilimitado' : '${usage.backupsThisMonth} / ${limits.maxBackupsPerMonth}', AppColors.success),
           const SizedBox(height: 12),
           _PlanStat('Keys protegidas', _formatKeys(usage.totalKeys), AppColors.textSecondary),
         ],
