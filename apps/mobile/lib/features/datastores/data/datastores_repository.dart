@@ -14,7 +14,11 @@ class DataStoresRepository {
       final data = res.data;
       final list = data is Map ? (data['data'] as List? ?? []) : (data as List);
       return list
-          .map((e) => DataStoreModel.fromJson(e as Map<String, dynamic>))
+          .whereType<Map<String, dynamic>>()
+          .map((e) {
+            try { return DataStoreModel.fromJson(e); } catch (_) { return null; }
+          })
+          .whereType<DataStoreModel>()
           .toList();
     } on DioException catch (e) {
       throw Exception(_parseError(e));
