@@ -4,26 +4,25 @@ import '../data/dashboard_repository.dart';
 import '../data/models/dashboard_stats_model.dart';
 import '../data/models/backup_chart_model.dart';
 import '../data/models/insight_model.dart';
-import '../../games/domain/selected_game_provider.dart';
 
 final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) {
   return DashboardRepository(ref.read(apiClientProvider));
 });
 
+// Global stats — no game filter
 final dashboardStatsProvider = FutureProvider.autoDispose<DashboardStatsModel>((ref) async {
-  final selectedGame = ref.watch(selectedGameProvider);
   final repo = ref.read(dashboardRepositoryProvider);
-  return repo.getStats(selectedGame?.id);
+  return repo.getStats(null);
 });
 
+// Global chart — no game filter
 final chartDataProvider = FutureProvider.autoDispose<List<BackupChartPoint>>((ref) async {
-  final selectedGame = ref.watch(selectedGameProvider);
   final repo = ref.read(dashboardRepositoryProvider);
-  return repo.getChartData(selectedGame?.id);
+  return repo.getChartData(null);
 });
 
+// Global insights — no game filter
 final insightsProvider = FutureProvider.autoDispose<List<InsightModel>>((ref) async {
-  final selectedGame = ref.watch(selectedGameProvider);
   final repo = ref.read(dashboardRepositoryProvider);
-  return repo.getInsights(selectedGame?.id);
+  return repo.getInsights(null);
 });
