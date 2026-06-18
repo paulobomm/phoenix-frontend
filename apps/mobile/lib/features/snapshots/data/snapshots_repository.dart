@@ -58,10 +58,7 @@ class SnapshotsRepository {
   Future<SnapshotModel?> getSnapshot(String jobId) async {
     try {
       final res = await _apiClient.snapshotsDio.get('/v1/snapshots/$jobId');
-      final snapshot = SnapshotModel.fromJson(res.data as Map<String, dynamic>);
-      // ignore: avoid_print
-      print('[Snapshot] id=${snapshot.id} status=${snapshot.status} raw=${res.data['status']}');
-      return snapshot;
+      return SnapshotModel.fromJson(res.data as Map<String, dynamic>);
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) return null;
       throw Exception(_parseError(e));

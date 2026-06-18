@@ -11,6 +11,41 @@ class SnapshotDetailPage extends ConsumerWidget {
   final String snapshotId;
   const SnapshotDetailPage({super.key, required this.snapshotId});
 
+  String _statusLabel(String? status) {
+    switch (status) {
+      case 'completed': return 'Completo';
+      case 'failed': return 'Falhou';
+      case 'running': return 'Em progresso';
+      case 'pending': return 'Em progresso';
+      case 'scheduled': return 'Em progresso';
+      default: return status ?? 'Em progresso';
+    }
+  }
+
+  BadgeStatus _badgeStatus(String? status) {
+    switch (status) {
+      case 'completed': return BadgeStatus.success;
+      case 'failed': return BadgeStatus.error;
+      default: return BadgeStatus.warning;
+    }
+  }
+
+  Color _statusColor(String? status) {
+    switch (status) {
+      case 'completed': return AppColors.success;
+      case 'failed': return AppColors.error;
+      default: return AppColors.warning;
+    }
+  }
+
+  IconData _statusIcon(String? status) {
+    switch (status) {
+      case 'completed': return Icons.cloud_done_rounded;
+      case 'failed': return Icons.cloud_off_rounded;
+      default: return Icons.cloud_upload_rounded;
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final snapshotAsync = ref.watch(snapshotDetailProvider(snapshotId));
@@ -60,20 +95,20 @@ class SnapshotDetailPage extends ConsumerWidget {
                             width: 48,
                             height: 48,
                             decoration: BoxDecoration(
-                              color: AppColors.success.withValues(alpha: 0.1),
+                              color: _statusColor(snap?.status).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Icon(Icons.cloud_done_rounded, color: AppColors.success, size: 24),
+                            child: Icon(_statusIcon(snap?.status), color: _statusColor(snap?.status), size: 24),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(snap?.name ?? 'Backup Automático',
+                                Text(snap?.name ?? 'Backup',
                                     style: const TextStyle(color: AppColors.text, fontSize: 18, fontWeight: FontWeight.w700)),
                                 const SizedBox(height: 6),
-                                const PhoenixBadge(label: 'Completo', status: BadgeStatus.success),
+                                PhoenixBadge(label: _statusLabel(snap?.status), status: _badgeStatus(snap?.status)),
                               ],
                             ),
                           ),
