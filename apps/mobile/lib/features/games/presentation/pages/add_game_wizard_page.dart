@@ -6,6 +6,10 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/phoenix_button.dart';
 import '../../../../shared/widgets/phoenix_text_field.dart';
 import '../../domain/games_provider.dart';
+import '../../data/models/game_model.dart';
+import '../../../snapshots/domain/snapshots_provider.dart';
+import '../../../datastores/domain/datastores_provider.dart';
+import '../../../datastores/data/models/datastore_model.dart';
 
 class AddGameWizardPage extends ConsumerStatefulWidget {
   final bool isDialog;
@@ -24,7 +28,23 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
   bool _obscureKey = true;
   bool _isValidating = false;
   bool _apiKeyValid = false;
+
+  // Step 3 state
+  bool _isCreatingGame = false;
+  GameModel? _createdGame;
+  bool _loadingDatastores = false;
+  List<DataStoreModel> _datastores = [];
+  Set<String> _selectedDatastoreIds = {};
   bool _isFinishing = false;
+
+  static const _intervalOptions = [
+    (label: 'A cada 5 minutos',  cron: '*/5 * * * *'),
+    (label: 'A cada 10 minutos', cron: '*/10 * * * *'),
+    (label: 'A cada 15 minutos', cron: '*/15 * * * *'),
+    (label: 'A cada 30 minutos', cron: '*/30 * * * *'),
+    (label: 'A cada 1 hora',     cron: '0 * * * *'),
+  ];
+  int _selectedIntervalIndex = 2; // padrão: 15 min
 
   @override
   void dispose() {
@@ -42,30 +62,65 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
     if (mounted) setState(() { _isValidating = false; _apiKeyValid = true; });
   }
 
-  Future<void> _finish() async {
-    setState(() => _isFinishing = true);
+  // Called when advancing from step 2 → step 3: creates the game and loads datastores
+  Future<void> _createGameAndAdvance() async {
+    setState(() => _isCreatingGame = true);
     try {
-      await ref.read(gamesProvider.notifier).addGame(
+      final game = await ref.read(gamesProvider.notifier).addGame(
         _nameCtrl.text.trim(),
         _universeIdCtrl.text.trim(),
         _apiKeyCtrl.text.trim(),
       );
       if (!mounted) return;
-      if (widget.isDialog) {
-        Navigator.of(context).pop();
-      } else {
-        context.pop();
+      setState(() {
+        _createdGame = game;
+        _currentStep = 2;
+        _loadingDatastores = true;
+      });
+      // Load datastores in background
+      if (game != null) {
+        try {
+          final repo = ref.read(datastoresRepositoryProvider);
+          final ds = await repo.getDataStores(game.id);
+          if (!mounted) return;
+          setState(() {
+            _datastores = ds;
+            _selectedDatastoreIds = ds.map((d) => d.id).toSet();
+          });
+        } catch (_) {
+          // Datastores not available yet — that's ok
+        }
       }
+      if (mounted) setState(() => _loadingDatastores = false);
     } catch (e) {
       if (!mounted) return;
+      setState(() => _isCreatingGame = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('Erro: $e'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating),
+        SnackBar(content: Text('Erro ao cadastrar: $e'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating),
       );
+      return;
+    }
+    if (mounted) setState(() => _isCreatingGame = false);
+  }
+
+  Future<void> _finish() async {
+    final game = _createdGame;
+    if (game == null) return;
+    setState(() => _isFinishing = true);
+    try {
+      final cron = _intervalOptions[_selectedIntervalIndex].cron;
+      final repo = ref.read(snapshotsRepositoryProvider);
+      await repo.createSchedule(game.id, cron);
+    } catch (_) {
+      // schedule creation is best-effort
     } finally {
       if (mounted) setState(() => _isFinishing = false);
+    }
+    if (!mounted) return;
+    if (widget.isDialog) {
+      Navigator.of(context).pop();
+    } else {
+      context.pop();
     }
   }
 
@@ -142,7 +197,7 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
               ),
               const Spacer(),
               Text(
-                ['Informações Básicas', 'API Key', 'Integração'][_currentStep],
+                ['Informações Básicas', 'API Key', 'Configuração'][_currentStep],
                 style: const TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600),
               ),
             ],
@@ -192,9 +247,7 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
           onPressed: () {
             if (_nameCtrl.text.trim().isEmpty || _universeIdCtrl.text.trim().isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Preencha Nome e Universe ID'),
-                    behavior: SnackBarBehavior.floating),
+                const SnackBar(content: Text('Preencha Nome e Universe ID'), behavior: SnackBarBehavior.floating),
               );
               return;
             }
@@ -271,9 +324,11 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
         ],
         const SizedBox(height: 20),
         PhoenixButton(
-          label: _apiKeyValid ? 'Validada! →' : 'Validar e Próximo →',
-          onPressed: _apiKeyValid ? () => setState(() => _currentStep = 2) : (_apiKeyCtrl.text.isEmpty ? null : _validateApiKey),
-          isLoading: _isValidating,
+          label: _apiKeyValid ? 'Cadastrar e Configurar →' : 'Validar e Próximo →',
+          onPressed: _apiKeyValid
+              ? _createGameAndAdvance
+              : (_apiKeyCtrl.text.isEmpty ? null : _validateApiKey),
+          isLoading: _isValidating || _isCreatingGame,
           width: double.infinity,
           backgroundColor: _apiKeyValid ? AppColors.success : null,
         ),
@@ -287,74 +342,203 @@ class _AddGameWizardPageState extends ConsumerState<AddGameWizardPage> {
   }
 
   Widget _buildStep3() {
-    const luaCode = '''local DataStoreService = game:GetService("DataStoreService")
-local HttpService = game:GetService("HttpService")
-
--- Phoenix DataStore Hook
-local function onDataChanged(store, key, value)
-  -- Phoenix will automatically detect changes
-end''';
-
     return Column(
       key: const ValueKey(2),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Integração com Luau',
-            style: TextStyle(color: AppColors.text, fontSize: 16, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 4),
-        const Text('Adicione este código ao seu jogo para monitoramento em tempo real',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-        const SizedBox(height: 16),
+        // ── Backup interval ──────────────────────────────────────────────
+        const Text('INTERVALO DE BACKUP',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.8)),
+        const SizedBox(height: 10),
         Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
           decoration: BoxDecoration(
-            color: AppColors.background,
+            color: AppColors.card,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.border),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: _selectedIntervalIndex,
+              isExpanded: true,
+              dropdownColor: AppColors.card,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary),
+              style: const TextStyle(color: AppColors.text, fontSize: 14),
+              items: List.generate(_intervalOptions.length, (i) {
+                return DropdownMenuItem(value: i, child: Text(_intervalOptions[i].label));
+              }),
+              onChanged: (i) {
+                if (i != null) setState(() => _selectedIntervalIndex = i);
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
+          ),
+          child: Row(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Script Luau', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
-                  GestureDetector(
-                    onTap: () {
-                      Clipboard.setData(const ClipboardData(text: luaCode));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Código copiado!'), duration: Duration(seconds: 1), behavior: SnackBarBehavior.floating),
-                      );
-                    },
-                    child: const Row(
-                      children: [
-                        Icon(Icons.copy_rounded, color: AppColors.primary, size: 14),
-                        SizedBox(width: 4),
-                        Text('Copiar', style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                luaCode,
-                style: TextStyle(color: AppColors.text, fontSize: 11, fontFamily: 'monospace', height: 1.5),
+              const Icon(Icons.schedule_rounded, color: AppColors.primary, size: 14),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Cron: ${_intervalOptions[_selectedIntervalIndex].cron}',
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 11, fontFamily: 'monospace'),
+                ),
               ),
             ],
           ),
         ),
         const SizedBox(height: 24),
+
+        // ── Datastores ───────────────────────────────────────────────────
+        Row(
+          children: [
+            const Text('DATASTORES ENCONTRADOS',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.8)),
+            if (_loadingDatastores) ...[
+              const SizedBox(width: 10),
+              const SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (!_loadingDatastores && _datastores.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline_rounded, color: AppColors.textSecondary, size: 16),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Os datastores serão descobertos automaticamente após o primeiro backup.',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else if (_datastores.isNotEmpty)
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: [
+                // Header with "select all"
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text('Datastore', style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
+                      ),
+                      const Text('Tipo', style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
+                      const SizedBox(width: 14),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            if (_selectedDatastoreIds.length == _datastores.length) {
+                              _selectedDatastoreIds = {};
+                            } else {
+                              _selectedDatastoreIds = _datastores.map((d) => d.id).toSet();
+                            }
+                          });
+                        },
+                        child: Text(
+                          _selectedDatastoreIds.length == _datastores.length ? 'Desm. todos' : 'Sel. todos',
+                          style: const TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(color: AppColors.border, height: 1),
+                ..._datastores.map((ds) {
+                  final isSelected = _selectedDatastoreIds.contains(ds.id);
+                  return InkWell(
+                    onTap: () {
+                      setState(() {
+                        if (isSelected) {
+                          _selectedDatastoreIds.remove(ds.id);
+                        } else {
+                          _selectedDatastoreIds.add(ds.id);
+                        }
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: Checkbox(
+                              value: isSelected,
+                              onChanged: (v) {
+                                setState(() {
+                                  if (v == true) {
+                                    _selectedDatastoreIds.add(ds.id);
+                                  } else {
+                                    _selectedDatastoreIds.remove(ds.id);
+                                  }
+                                });
+                              },
+                              activeColor: AppColors.primary,
+                              side: const BorderSide(color: AppColors.border, width: 1.5),
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              ds.name,
+                              style: const TextStyle(color: AppColors.text, fontSize: 13, fontFamily: 'monospace'),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.border.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              ds.type,
+                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+
+        const SizedBox(height: 24),
         PhoenixButton(
-          label: 'Finalizar',
+          label: 'Concluir Cadastro ✓',
           onPressed: _finish,
           isLoading: _isFinishing,
           width: double.infinity,
-        ),
-        const SizedBox(height: 12),
-        TextButton(
-          onPressed: () => setState(() => _currentStep = 1),
-          child: const Text('← Voltar', style: TextStyle(color: AppColors.textSecondary)),
         ),
       ],
     );

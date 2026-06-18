@@ -31,15 +31,17 @@ class GamesNotifier extends StateNotifier<AsyncValue<List<GameModel>>> {
     }
   }
 
-  Future<void> addGame(String name, String universeId, String apiKey) async {
+  Future<GameModel?> addGame(String name, String universeId, String apiKey) async {
     try {
       final newGame = await _repository.addGame(name, universeId, apiKey);
       final current = state.valueOrNull ?? [];
       final updated = [...current, newGame];
       state = AsyncData(updated);
       _syncSelectedGame(updated);
+      return newGame;
     } catch (e, st) {
       state = AsyncError(e, st);
+      return null;
     }
   }
 
