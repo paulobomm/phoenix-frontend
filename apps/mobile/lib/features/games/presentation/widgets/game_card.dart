@@ -27,13 +27,13 @@ class GameCard extends ConsumerWidget {
     final snapshotCountAsync = ref.watch(snapshotCountProvider(game.id));
 
     final datastoreLabel = datastoreCountAsync.when(
-      data: (n) => '$n DataStore${n == 1 ? '' : 's'}',
-      loading: () => '...',
-      error: (_, __) => '0 DS',
+      data: (n) => "$n DataStore${n == 1 ? '' : 's'}",
+      loading: () => '... DataStores',
+      error: (_, __) => '0 DataStores',
     );
 
     final snapshotLabel = snapshotCountAsync.when(
-      data: (n) => '$n snapshot${n == 1 ? '' : 's'}',
+      data: (n) => "$n snapshot${n == 1 ? '' : 's'}",
       loading: () => '...',
       error: (_, __) => '0 snapshots',
     );
