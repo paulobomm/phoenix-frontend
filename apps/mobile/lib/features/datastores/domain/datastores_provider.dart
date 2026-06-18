@@ -21,8 +21,12 @@ final datastoreCountProvider =
     FutureProvider.autoDispose.family<int, String>((ref, projectId) async {
   if (projectId.isEmpty) return 0;
   final repo = ref.read(datastoresRepositoryProvider);
-  final list = await repo.getDataStores(projectId);
-  return list.length;
+  try {
+    final list = await repo.getDataStores(projectId);
+    return list.length;
+  } catch (_) {
+    return 0;
+  }
 });
 
 final entriesProvider =

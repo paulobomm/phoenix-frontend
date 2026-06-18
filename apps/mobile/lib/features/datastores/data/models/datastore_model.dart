@@ -18,14 +18,15 @@ class DataStoreModel {
   });
 
   factory DataStoreModel.fromJson(Map<String, dynamic> json) {
+    final now = DateTime.now();
     return DataStoreModel(
-      id: json['id'] as String,
-      name: json['name'] as String,
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
       type: json['type'] as String? ?? 'standard',
       entryCount: (json['entryCount'] as num?)?.toInt() ?? 0,
       sizeBytes: (json['sizeBytes'] as num?)?.toInt() ?? 0,
-      firstSeenAt: DateTime.parse(json['firstSeenAt'] as String),
-      lastSeenAt: DateTime.parse(json['lastSeenAt'] as String),
+      firstSeenAt: json['firstSeenAt'] != null ? DateTime.tryParse(json['firstSeenAt'] as String) ?? now : now,
+      lastSeenAt: json['lastSeenAt'] != null ? DateTime.tryParse(json['lastSeenAt'] as String) ?? now : now,
     );
   }
 
