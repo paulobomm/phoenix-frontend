@@ -32,12 +32,20 @@ class SnapshotsRepository {
       final inProgress = snapshots.where((s) => !terminalStatuses.contains(s.status)).toList();
       if (inProgress.isNotEmpty) {
         final updates = await Future.wait(
-          inProgress.map((s) => getSnapshot(s.id).catchError((_) => null as SnapshotModel?)),
+          inProgress.map((s) async {
+            try {
+              return await getSnapshot(s.id);
+            } catch (_) {
+              return null;
+            }
+          }),
         );
         final updateMap = <String, SnapshotModel>{};
         for (final u in updates) {
           if (u != null) updateMap[u.id] = u;
         }
+        // If detail returned a still-non-terminal status, keep the detail version
+        // (it's fresher than the list). Only keep list version if no detail found.
         return snapshots.map((s) => updateMap[s.id] ?? s).toList();
       }
 
@@ -50,7 +58,10 @@ class SnapshotsRepository {
   Future<SnapshotModel?> getSnapshot(String jobId) async {
     try {
       final res = await _apiClient.snapshotsDio.get('/v1/snapshots/$jobId');
-      return SnapshotModel.fromJson(res.data as Map<String, dynamic>);
+      final snapshot = SnapshotModel.fromJson(res.data as Map<String, dynamic>);
+      // ignore: avoid_print
+      print('[Snapshot] id=${snapshot.id} status=${snapshot.status} raw=${res.data['status']}');
+      return snapshot;
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) return null;
       throw Exception(_parseError(e));
