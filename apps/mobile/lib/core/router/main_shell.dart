@@ -8,22 +8,22 @@ class MainShell extends ConsumerWidget {
   final Widget child;
   const MainShell({super.key, required this.child});
 
-  static const _navRoutes = ['/dashboard', '/games', '/snapshots', '/restore', '/logs'];
+  static const _navRoutes = ['/dashboard', '/games', '/snapshots', '/restore', '/settings'];
   static const _navIcons = [
     Icons.home_outlined,
     Icons.videogame_asset_outlined,
     Icons.cloud_outlined,
     Icons.restore_rounded,
-    Icons.history_rounded,
+    Icons.settings_outlined,
   ];
   static const _navActiveIcons = [
     Icons.home_rounded,
     Icons.videogame_asset_rounded,
     Icons.cloud_rounded,
     Icons.restore_rounded,
-    Icons.history_rounded,
+    Icons.settings_rounded,
   ];
-  static const _navLabels = ['Visão Geral', 'Jogos', 'Backups', 'Restore', 'Histórico'];
+  static const _navLabels = ['Visão Geral', 'Jogos', 'Backups', 'Restore', 'Config.'];
 
   int _currentIndex(String path) {
     if (path.startsWith('/dashboard')) return 0;
@@ -31,8 +31,8 @@ class MainShell extends ConsumerWidget {
     if (path.startsWith('/snapshots') || path.startsWith('/compare')) return 2;
     if (path.startsWith('/restore')) return 3;
     if (path.startsWith('/logs')) return 4;
-    if (path.startsWith('/settings')) return 5;
-    if (path.startsWith('/billing')) return 6;
+    if (path.startsWith('/settings')) return 4;
+    if (path.startsWith('/billing')) return 5;
     return 0;
   }
 
