@@ -1,36 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/phoenix_button.dart';
+import '../../data/models/snapshot_model.dart';
+import '../../domain/snapshots_provider.dart';
 
-class CompareSnapshotsPage extends StatefulWidget {
+class CompareSnapshotsPage extends ConsumerStatefulWidget {
   const CompareSnapshotsPage({super.key});
 
   @override
-  State<CompareSnapshotsPage> createState() => _CompareSnapshotsPageState();
+  ConsumerState<CompareSnapshotsPage> createState() => _CompareSnapshotsPageState();
 }
 
-class _CompareSnapshotsPageState extends State<CompareSnapshotsPage> {
-  String? _snapA = 'Backup Automático (15 Jan)';
-  String? _snapB = 'Backup Manual (14 Jan)';
+class _CompareSnapshotsPageState extends ConsumerState<CompareSnapshotsPage> {
+  SnapshotModel? _snapA;
+  SnapshotModel? _snapB;
   bool _compared = false;
   bool _isComparing = false;
 
-  final _snapshots = [
-    'Backup Automático (15 Jan)',
-    'Backup Manual (14 Jan)',
-    'Backup Automático (13 Jan)',
-    'Backup Automático (12 Jan)',
-  ];
-
-  final _mockDiff = {
-    'added': ['Player_99123456', 'Player_77654321'],
-    'removed': ['Player_00000001'],
-    'modified': ['Player_12345678', 'Player_87654321', 'Player_55443322'],
-  };
+  String _label(SnapshotModel s) {
+    final months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    final d = s.createdAt;
+    return '${s.name} (${d.day} ${months[d.month - 1]})';
+  }
 
   Future<void> _compare() async {
     setState(() => _isComparing = true);
-    await Future.delayed(const Duration(milliseconds: 1500));
+    await Future.delayed(const Duration(milliseconds: 800));
     setState(() {
       _isComparing = false;
       _compared = true;
@@ -39,6 +35,8 @@ class _CompareSnapshotsPageState extends State<CompareSnapshotsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final snapshotsAsync = ref.watch(snapshotsProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -50,80 +48,95 @@ class _CompareSnapshotsPageState extends State<CompareSnapshotsPage> {
         title: const Text('Comparar Snapshots',
             style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w700)),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: _snapshotDropdown('Snapshot A', _snapA, (v) => setState(() { _snapA = v; _compared = false; })),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: const Icon(Icons.compare_arrows_rounded, color: AppColors.textSecondary, size: 16),
-                  ),
-                ),
-                Expanded(
-                  child: _snapshotDropdown('Snapshot B', _snapB, (v) => setState(() { _snapB = v; _compared = false; })),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            PhoenixButton(
-              label: 'Comparar',
-              isLoading: _isComparing,
-              onPressed: _compare,
-              width: double.infinity,
-              icon: Icons.search_rounded,
-            ),
-            if (_compared) ...[
-              const SizedBox(height: 32),
-              _diffSection('Adicionados', _mockDiff['added']!, AppColors.success, Icons.add_circle_outline_rounded),
-              const SizedBox(height: 16),
-              _diffSection('Removidos', _mockDiff['removed']!, AppColors.error, Icons.remove_circle_outline_rounded),
-              const SizedBox(height: 16),
-              _diffSection('Modificados', _mockDiff['modified']!, AppColors.warning, Icons.edit_outlined),
-              const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.card,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Resumo', style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w600, fontSize: 15)),
-                    const SizedBox(height: 16),
-                    _summaryRow('Total de mudanças', '6', AppColors.primary),
-                    const SizedBox(height: 10),
-                    _summaryRow('Adicionados', '${_mockDiff['added']!.length}', AppColors.success),
-                    const SizedBox(height: 10),
-                    _summaryRow('Removidos', '${_mockDiff['removed']!.length}', AppColors.error),
-                    const SizedBox(height: 10),
-                    _summaryRow('Modificados', '${_mockDiff['modified']!.length}', AppColors.warning),
-                  ],
+      body: snapshotsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        error: (e, _) => Center(child: Text('Erro: $e', style: const TextStyle(color: AppColors.error))),
+        data: (snapshots) {
+          final completed = snapshots.where((s) => s.status == 'completed').toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+          if (completed.isEmpty) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: Text(
+                  'Nenhum snapshot disponível para comparação.',
+                  style: TextStyle(color: AppColors.textSecondary),
+                  textAlign: TextAlign.center,
                 ),
               ),
-            ],
-          ],
-        ),
+            );
+          }
+
+          if (completed.length < 2) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: Text(
+                  'São necessários pelo menos 2 snapshots para comparar.',
+                  style: TextStyle(color: AppColors.textSecondary),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
+          }
+
+          // Auto-select A and B on first load
+          if (_snapA == null && _snapB == null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) setState(() { _snapA = completed[0]; _snapB = completed[1]; });
+            });
+          }
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _snapshotDropdown('Snapshot A', _snapA, completed, (v) => setState(() { _snapA = v; _compared = false; })),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: AppColors.card,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: const Icon(Icons.compare_arrows_rounded, color: AppColors.textSecondary, size: 16),
+                      ),
+                    ),
+                    Expanded(
+                      child: _snapshotDropdown('Snapshot B', _snapB, completed, (v) => setState(() { _snapB = v; _compared = false; })),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                PhoenixButton(
+                  label: 'Comparar',
+                  isLoading: _isComparing,
+                  onPressed: (_snapA != null && _snapB != null && _snapA!.id != _snapB!.id) ? _compare : null,
+                  width: double.infinity,
+                  icon: Icons.search_rounded,
+                ),
+                if (_compared && _snapA != null && _snapB != null) ...[
+                  const SizedBox(height: 32),
+                  _CompareResult(snapA: _snapA!, snapB: _snapB!),
+                ],
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _snapshotDropdown(String label, String? value, ValueChanged<String?> onChanged) {
+  Widget _snapshotDropdown(String label, SnapshotModel? value, List<SnapshotModel> options, ValueChanged<SnapshotModel?> onChanged) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
@@ -131,7 +144,7 @@ class _CompareSnapshotsPageState extends State<CompareSnapshotsPage> {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.border),
       ),
-      child: DropdownButton<String>(
+      child: DropdownButton<SnapshotModel>(
         value: value,
         isExpanded: true,
         hint: Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
@@ -139,56 +152,117 @@ class _CompareSnapshotsPageState extends State<CompareSnapshotsPage> {
         dropdownColor: AppColors.card,
         underline: const SizedBox(),
         icon: const Icon(Icons.expand_more_rounded, color: AppColors.textSecondary, size: 18),
-        items: _snapshots.map((s) => DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis))).toList(),
+        items: options.map((s) => DropdownMenuItem(
+          value: s,
+          child: Text(_label(s), overflow: TextOverflow.ellipsis),
+        )).toList(),
         onChanged: onChanged,
       ),
     );
   }
+}
 
-  Widget _diffSection(String title, List<String> items, Color color, IconData icon) {
+class _CompareResult extends StatelessWidget {
+  final SnapshotModel snapA;
+  final SnapshotModel snapB;
+
+  const _CompareResult({required this.snapA, required this.snapB});
+
+  @override
+  Widget build(BuildContext context) {
+    final keysA = snapA.keyCount ?? 0;
+    final keysB = snapB.keyCount ?? 0;
+    final diff = (keysA - keysB).abs();
+    final added = keysA > keysB ? keysA - keysB : 0;
+    final removed = keysB > keysA ? keysB - keysA : 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (diff == 0)
+          _infoBox(
+            'Os snapshots possuem o mesmo número de keys ($keysA).',
+            AppColors.primary,
+            Icons.check_circle_outline_rounded,
+          )
+        else ...[
+          if (added > 0)
+            _diffSection('Adicionadas', '$added keys a mais em A', AppColors.success, Icons.add_circle_outline_rounded),
+          if (removed > 0) ...[
+            const SizedBox(height: 16),
+            _diffSection('Removidas', '$removed keys a menos em A', AppColors.error, Icons.remove_circle_outline_rounded),
+          ],
+        ],
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Resumo', style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w600, fontSize: 15)),
+              const SizedBox(height: 16),
+              _summaryRow('Keys em A', '$keysA', AppColors.primary),
+              const SizedBox(height: 10),
+              _summaryRow('Keys em B', '$keysB', AppColors.primary),
+              const SizedBox(height: 10),
+              _summaryRow('Diferença total', '$diff', diff == 0 ? AppColors.success : AppColors.warning),
+              if (snapA.sizeBytes != null && snapB.sizeBytes != null) ...[
+                const SizedBox(height: 10),
+                _summaryRow('Tamanho A', snapA.formattedSize, AppColors.textSecondary),
+                const SizedBox(height: 10),
+                _summaryRow('Tamanho B', snapB.formattedSize, AppColors.textSecondary),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _infoBox(String msg, Color color, IconData icon) {
     return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 10),
+          Expanded(child: Text(msg, style: TextStyle(color: color, fontSize: 13))),
+        ],
+      ),
+    );
+  }
+
+  Widget _diffSection(String title, String detail, Color color, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon, color: color, size: 18),
-                const SizedBox(width: 8),
                 Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 14)),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text('${items.length}', style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
-                ),
+                Text(detail, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
               ],
             ),
           ),
-          const Divider(color: AppColors.border, height: 1),
-          ...items.map((key) => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(key, style: const TextStyle(color: AppColors.text, fontSize: 13, fontFamily: 'monospace')),
-                  ],
-                ),
-              )),
         ],
       ),
     );

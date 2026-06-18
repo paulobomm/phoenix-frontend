@@ -54,18 +54,23 @@ final realSnapshotStatsProvider =
       try { return await repo.getSnapshots(g.id); } catch (_) { return <SnapshotModel>[]; }
     }),
   );
+  int totalAll = 0;
   for (final snapshots in allSnapshots) {
-    total += snapshots.length;
+    totalAll += snapshots.length;
     for (final s in snapshots) {
       if (s.status == 'completed') {
         completed++;
         totalBytes += s.sizeBytes ?? 0;
+        total++;
+      } else if (s.status == 'failed' || s.status == 'cancelled') {
+        total++;
       }
+      // pending/running are not counted in the success rate denominator
     }
   }
   final rate = total == 0 ? 100.0 : (completed / total * 100);
   return RealSnapshotStats(
-    totalBackups: total,
+    totalBackups: totalAll,
     storageUsedGb: totalBytes / (1024 * 1024 * 1024),
     successRate: rate,
   );
