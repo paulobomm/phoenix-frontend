@@ -35,10 +35,24 @@ class GameModel {
     );
   }
 
+  /// Payload enviado à API ao criar/atualizar um jogo.
   Map<String, dynamic> toJson() => {
     'name': name,
     'universeId': universeId,
     'status': status,
+  };
+
+  /// Serialização completa para o cache local (inclui campos que `toJson`
+  /// omite, como id/ownerUserId/datas), de modo que `fromJson` reconstrua o
+  /// objeto integralmente ao reabrir o app.
+  Map<String, dynamic> toCacheJson() => {
+    'id': id,
+    'ownerUserId': ownerUserId,
+    'name': name,
+    'universeId': universeId,
+    'status': status,
+    'createdAt': createdAt?.toIso8601String(),
+    'updatedAt': updatedAt?.toIso8601String(),
   };
 
   GameModel copyWith({
