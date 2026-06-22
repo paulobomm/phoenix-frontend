@@ -286,10 +286,16 @@ A View **não concentra regras de negócio**: carregamento, chamada ao repositó
 
 ### 8.2 Padrão de projeto adicional: **Observer** (+ Singleton, Factory, Facade)
 
-- **Observer (principal):** reatividade do Riverpod. As Views se inscrevem (`ref.watch`) num ViewModel observável e são reconstruídas quando o estado muda. Quando `selectedGameProvider` muda, `snapshotsProvider` (que faz `ref.watch`) é reavaliado e todas as Views inscritas se atualizam — sem acoplamento entre telas.
-- **Singleton:** `ApiClient` instanciado uma única vez e compartilhado por todos os repositórios via `apiClientProvider`.
-- **Factory:** todos os models usam `factory fromJson(...)` para desserializar o JSON da API.
-- **Facade:** `LocalStorageService` abstrai `flutter_secure_storage` + `shared_preferences` atrás de uma interface única.
+**Padrão escolhido: Observer**
+
+**Por que foi escolhido:**
+O app é fortemente orientado a estado assíncrono: os dados vêm da rede, o jogo selecionado muda a qualquer momento e várias telas precisam reagir à mesma fonte de dados simultaneamente. O padrão **Observer** resolve isso nativamente — as Views se *inscrevem* (`ref.watch`) num ViewModel observável e são notificadas/reconstruídas automaticamente quando o estado muda, sem acoplamento direto entre telas. A alternativa (passar callbacks entre widgets ou usar `setState` local) criaria dependências frágeis e exigiria sincronização manual sempre que o estado global mudasse. O Riverpod implementa o Observer de forma declarativa e com suporte nativo a estados assíncronos (`AsyncLoading / AsyncData / AsyncError`), tornando a escolha natural para o domínio do app.
+
+**Onde foi aplicado:**
+- **Observer:** `StateNotifierProvider`/`FutureProvider` do Riverpod. Quando `selectedGameProvider` muda, `snapshotsProvider` (que faz `ref.watch(selectedGameProvider)`) é automaticamente reavaliado e todas as Views inscritas se atualizam. O roteador também observa o estado de auth via `authStateListenable` para redirecionar entre login e área logada.
+- **Singleton:** `ApiClient` instanciado uma única vez e compartilhado por todos os repositórios via `apiClientProvider` — garante uma só configuração de Dio/headers/token em todo o app.
+- **Factory:** todos os models usam `factory fromJson(...)` para desserializar o JSON da API (`GameModel.fromJson`, `SnapshotModel.fromJson`, etc.).
+- **Facade:** `LocalStorageService` abstrai `flutter_secure_storage` + `shared_preferences` atrás de uma interface única e coesa.
 
 ### 8.3 Integração com API (loading / sucesso / erro)
 
@@ -330,7 +336,26 @@ if (savedToken != null && savedToken.isNotEmpty) {
 }
 ```
 
-## 9. Quadro-resumo de conformidade
+## 9. Conclusão
+
+### Principais decisões
+
+- **MVVM com Riverpod:** a organização em camadas `data/domain/presentation` com `StateNotifier` como ViewModel observável garante separação clara e testável entre dados, lógica de aplicação e interface. A View nunca toma decisões de negócio — só reage ao estado exposto pelo ViewModel.
+- **Observer como padrão central:** a reatividade do Riverpod propaga mudanças de estado entre telas sem acoplamento, tornando a troca de jogo selecionado um evento transparente que atualiza dashboard, snapshots e datastores simultaneamente.
+- **Singleton para o cliente HTTP:** um `ApiClient` único centraliza a configuração de Dio (headers, token, interceptors) e é compartilhado por todos os repositórios via injeção de dependência.
+- **Persistência em duas camadas:** `flutter_secure_storage` para o token JWT (dado sensível, cifrado em repouso) e `shared_preferences` para o cache de domínio (lista de jogos + seleção), com restauração automática no boot — o usuário reabre o app já autenticado e com seus dados em tela, mesmo sem rede.
+- **Integração robusta com a API:** Dio por serviço, com tratamento explícito de carregamento, sucesso, erro e timeout, interceptor de 401 e desserialização tipada via `fromJson`.
+
+### Limitações e melhorias futuras
+
+1. **MVVM mais estrito:** ainda há formatações residuais nas Views (tradução de `eventType`, cálculo de "tempo atrás") que deveriam viver no ViewModel. São detalhes de exibição, mas o ideal seria movê-los para o próprio Notifier ou uma camada de apresentação dedicada.
+2. **Expiração de token:** a sessão restaurada confia no token salvo; a validade não é verificada no boot — um token expirado só é detectado na primeira chamada à API (retorna 401 e leva ao login). O correto seria decodificar o campo `exp` do JWT antes de restaurar a sessão.
+3. **Testes:** o app ainda não possui testes de widget ou unitários dos ViewModels. A arquitetura em camadas facilita isso, mas a cobertura precisa ser implementada.
+4. **Funções dependentes de back-end:** auto-cadastro, recuperação de senha e login Auth0 estão previstos na UI, mas dependem de endpoints ainda não disponíveis no servidor.
+
+---
+
+## 10. Quadro-resumo de conformidade
 
 | Requisito obrigatório | Situação |
 |---|---|
@@ -340,13 +365,6 @@ if (savedToken != null && savedToken.isNotEmpty) {
 | Armazenamento local (persistir + recuperar ao reabrir) | ✅ Atendido (secure_storage p/ token + shared_preferences p/ cache, restaurados no boot) |
 | Escopo mínimo (2+ telas, fluxo, interação) | ✅ Atendido com folga |
 | README + Relatório técnico | ✅ README atualizado + este relatório |
-
-## 10. Limitações e melhorias futuras
-
-1. **MVVM mais estrito:** mover formatações residuais (tradução de eventos, "tempo atrás") das Views para os ViewModels e, opcionalmente, renomear `*Notifier → *ViewModel`.
-2. **Expiração de token:** a sessão restaurada confia no token salvo; falta validar expiração no boot (hoje um token expirado só é detectado na primeira chamada à API, que retorna 401 e leva ao login).
-3. **Testes:** o app ainda não possui testes de widget/unitários dos ViewModels.
-4. **Funções dependentes de back-end:** auto-cadastro, recuperação de senha e login Auth0 estão previstos na UI, mas dependem de endpoints ainda não disponíveis no servidor.
 
 ---
 
