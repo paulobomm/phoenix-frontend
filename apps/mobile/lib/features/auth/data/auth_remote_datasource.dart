@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:dio/dio.dart';
 import '../../../core/network/api_client.dart';
 import 'models/auth_response_model.dart';
@@ -17,7 +16,8 @@ class AuthRemoteDataSource {
       });
       final accessToken = res.data['accessToken'] as String;
       _apiClient.setAuthToken(accessToken);
-      final user = _userFromToken(accessToken);
+      final user = UserModel.fromJwt(accessToken);
+      if (user == null) throw Exception('Não foi possível ler os dados do token.');
       return AuthResponseModel(token: accessToken, user: user);
     } on DioException catch (e) {
       throw Exception(_parseError(e));
@@ -41,28 +41,6 @@ class AuthRemoteDataSource {
   }
 
   void clearToken() => _apiClient.clearAuthToken();
-
-  /// Decodes the JWT payload to extract user info.
-  /// The IAM signs tokens with: { sub, email, permissions }.
-  UserModel _userFromToken(String token) {
-    try {
-      final parts = token.split('.');
-      if (parts.length != 3) throw Exception('Token inválido');
-      final payload = parts[1];
-      final normalized = base64Url.normalize(payload);
-      final decoded = utf8.decode(base64Url.decode(normalized));
-      final json = jsonDecode(decoded) as Map<String, dynamic>;
-      return UserModel(
-        id: json['sub'] as String,
-        name: (json['email'] as String).split('@').first,
-        email: json['email'] as String,
-        plan: 'free',
-        createdAt: DateTime.now(),
-      );
-    } catch (_) {
-      throw Exception('Não foi possível ler os dados do token.');
-    }
-  }
 
   String _parseError(DioException e) {
     final data = e.response?.data;

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class UserModel {
   final String id;
   final String name;
@@ -14,6 +16,29 @@ class UserModel {
     required this.plan,
     required this.createdAt,
   });
+
+  /// Decodifica o payload de um JWT do IAM (`{ sub, email, permissions }`)
+  /// num [UserModel]. Retorna `null` se o token for inválido. Usado tanto no
+  /// login quanto na restauração de sessão a partir do storage.
+  static UserModel? fromJwt(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return null;
+      final normalized = base64Url.normalize(parts[1]);
+      final decoded = utf8.decode(base64Url.decode(normalized));
+      final json = jsonDecode(decoded) as Map<String, dynamic>;
+      final email = json['email'] as String? ?? '';
+      return UserModel(
+        id: json['sub'] as String? ?? '',
+        name: email.contains('@') ? email.split('@').first : email,
+        email: email,
+        plan: 'free',
+        createdAt: DateTime.now(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
