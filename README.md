@@ -1,10 +1,49 @@
 # Phoenix Frontend
 
+## Descrição do App
+
+**Phoenix** é uma plataforma de **gestão de dados como serviço (DMaaS)** para desenvolvedores de jogos Roblox. O objetivo é resolver um problema crítico: DataStores de Roblox são difíceis de monitorar, não têm backup nativo confiável e não permitem restauração granular após corrupção ou exclusão acidental de dados de jogadores.
+
+### O que o Phoenix oferece
+
+- **Conexão de jogos** via Universe ID + Open Cloud API Key do Roblox
+- **Dashboard** com métricas de backups, armazenamento e atividade recente
+- **Snapshots (backups)** automáticos e manuais dos DataStores de cada jogo
+- **Restore granular** para restaurar um jogo a qualquer estado anterior
+- **Auditoria** com histórico completo de operações
+- **Gestão de plano** com limites de jogos e armazenamento
+
+### Arquitetura geral
+
+```
+┌─────────────────────────────────────────────┐
+│              Frontend (este repo)           │
+│  apps/web  (Next.js)  │  apps/mobile (Flutter) │
+└─────────────────────────────────────────────┘
+                    │ HTTP/REST
+┌─────────────────────────────────────────────┐
+│           Backend (phoenix-2)               │
+│  7 microsserviços NestJS orquestrados       │
+│  via Docker Compose                         │
+│  IAM · Projects · Discovery · Snapshots     │
+│  Restore · Admin-Data · Audit               │
+└─────────────────────────────────────────────┘
+                    │
+┌─────────────────────────────────────────────┐
+│           Infraestrutura                    │
+│  PostgreSQL 16 · RabbitMQ · MinIO/S3        │
+└─────────────────────────────────────────────┘
+```
+
+O **web** (`apps/web`) é um painel administrativo em Next.js 16 + React 19 voltado para desktop. O **mobile** (`apps/mobile`) é um app Flutter com arquitetura MVVM e Riverpod, voltado para acompanhamento e operações em campo.
+
+---
+
 Frontend do projeto **Phoenix** — plataforma de gerenciamento de DataStores Roblox.
 
 Este repositório contém dois apps:
 
-- `apps/web` — painel web (Next.js 14)
+- `apps/web` — painel web (Next.js 16)
 - `apps/mobile` — app mobile (Flutter)
 
 ---
@@ -222,7 +261,23 @@ curl -s -X POST \
 
 ---
 
-## 6. Estrutura do Projeto
+## 6. Onde Verificar se Está Tudo Funcionando
+
+Após subir o backend e o frontend, verifique:
+
+| Verificação | Como testar |
+|---|---|
+| Backend no ar | `docker ps` — todos os containers `Up`; `curl http://localhost:5001/v1/auth/login` retorna JSON |
+| Web funcionando | Abra `http://localhost:3000` — tela de login deve aparecer |
+| Mobile funcionando | App abre no emulador — tela de login deve aparecer |
+| Login funciona | Credenciais `admin@phoenix.gg` / `ChangeMe123!` levam ao dashboard |
+| DataStores carregados | Após cadastrar um jogo, aguarde ~30s e vá em **DataStores** — lista deve aparecer |
+| Backups rodando | Dashboard → card "Total de Backups" deve subir a cada ~5 min após o primeiro jogo cadastrado |
+| Sessão persistida | Feche e reabra o app mobile — deve abrir direto no dashboard sem pedir login |
+
+---
+
+## 7. Estrutura do Projeto
 
 ```
 phoenix-frontend/
@@ -252,7 +307,84 @@ phoenix-frontend/
 
 ---
 
-## 7. Tecnologias
+## 7. Padrões de Projeto
+
+### Arquitetura Mobile (MVVM + Riverpod)
+
+O app mobile segue a arquitetura **MVVM** organizada em três camadas por feature:
+
+```
+lib/features/<feature>/
+  data/          → Model: modelos imutáveis, DataSource (Dio), Repository
+  domain/        → ViewModel: StateNotifier que mantém e expõe o estado
+  presentation/  → View: ConsumerWidget que observa o ViewModel e renderiza
+```
+
+### Padrões aplicados
+
+| Padrão | Onde | Descrição |
+|---|---|---|
+| **Observer** | Riverpod (`StateNotifierProvider`, `ref.watch`) | Views se inscrevem no ViewModel e são reconstruídas automaticamente quando o estado muda. Trocar o jogo selecionado reconstrói dashboard, snapshots e datastores simultaneamente. |
+| **Singleton** | `ApiClient` via `apiClientProvider` | Uma única instância de ApiClient compartilhada por todos os repositórios — centraliza Dio, headers e token JWT. |
+| **Factory** | `fromJson` em todos os modelos | Construtores factory que desserializam JSON da API em objetos tipados (`GameModel.fromJson`, `SnapshotModel.fromJson`, etc.). |
+| **Facade** | `LocalStorageService` | Abstrai dois mecanismos de persistência (`flutter_secure_storage` + `shared_preferences`) atrás de uma interface coesa. |
+
+### Arquitetura Web (Next.js App Router)
+
+O app web usa o **App Router** do Next.js com:
+- **Zustand** para gerenciamento de estado global
+- **Axios** encapsulado em serviços por domínio (`/src/services/`)
+- Proxy reverso via `next.config.ts` para rotear chamadas `/api/*` aos microsserviços
+
+---
+
+## 8. API Utilizada
+
+O backend expõe uma **API REST** dividida em 7 microsserviços NestJS. Principais endpoints consumidos:
+
+| Funcionalidade | Método | Endpoint | Serviço |
+|---|---|---|---|
+| Login | `POST` | `/v1/auth/login` | IAM :5001 |
+| Listar jogos | `GET` | `/v1/projects` | Projects :5002 |
+| Criar jogo | `POST` | `/v1/projects` | Projects :5002 |
+| Deletar jogo | `DELETE` | `/v1/projects/:id` | Projects :5002 |
+| Listar DataStores | `GET` | `/v1/projects/:id/datastores` | Discovery :5003 |
+| Listar snapshots | `GET` | `/v1/projects/:id/snapshots` | Snapshots :5004 |
+| Executar restore | `POST` | `/v1/projects/:id/restore` | Restore :5005 |
+| Histórico de auditoria | `GET` | `/v1/audit` | Audit :5007 |
+
+**Autenticação:** JWT Bearer token obtido no login e enviado no header `Authorization` de todas as requisições subsequentes.
+
+**Tratamento de erros no mobile:**
+- `AsyncLoading` → skeletons/spinner na UI
+- `AsyncData` → dados renderizados
+- `AsyncError` → mensagem amigável (erros de validação, timeout, rede)
+- HTTP 401 → interceptor Dio redireciona para o login automaticamente
+
+---
+
+## 9. Armazenamento Local (Mobile)
+
+O app mobile usa dois mecanismos de persistência encapsulados pelo `LocalStorageService`:
+
+| Dado | Mecanismo | Motivo |
+|---|---|---|
+| Token JWT de sessão | `flutter_secure_storage` (cifrado) | Credencial sensível — mantém sessão entre aberturas sem novo login |
+| Lista de jogos (cache) | `shared_preferences` | Exibe os jogos imediatamente no cold start, antes da API responder |
+| ID do jogo selecionado | `shared_preferences` | Reabre o app já no último jogo escolhido pelo usuário |
+
+**Fluxo de restauração de sessão (boot):**
+1. `main()` lê o token de `flutter_secure_storage`
+2. Decodifica o JWT para extrair dados do usuário (`UserModel.fromJwt`)
+3. Injeta o token no `ApiClient` e monta um `AuthState` autenticado
+4. O roteador abre direto no dashboard — sem passar pelo login
+5. O `GamesNotifier` carrega do cache (`shared_preferences`) imediatamente e revalida com a API em paralelo
+
+No **logout**, token e cache são apagados (`deleteToken` + `clearCache`).
+
+---
+
+## 10. Tecnologias
 
 ### Web
 
@@ -264,10 +396,11 @@ phoenix-frontend/
 ### Mobile
 
 - [Flutter](https://flutter.dev/) (Dart)
-- [Riverpod](https://riverpod.dev/) para gerenciamento de estado
+- [Riverpod](https://riverpod.dev/) para gerenciamento de estado (Observer pattern)
 - [go_router](https://pub.dev/packages/go_router) para navegação
 - [Dio](https://pub.dev/packages/dio) para requisições HTTP
-- [flutter_secure_storage](https://pub.dev/packages/flutter_secure_storage) para armazenar o JWT
+- [flutter_secure_storage](https://pub.dev/packages/flutter_secure_storage) para armazenar o JWT (cifrado)
+- [shared_preferences](https://pub.dev/packages/shared_preferences) para cache de jogos e seleção
 
 ### Backend (phoenix-2)
 
