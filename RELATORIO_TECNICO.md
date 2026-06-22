@@ -3,6 +3,8 @@
 **Data:** 22/06/2026
 **Escopo:** Backend (`phoenix-2`) + Frontend (`phoenix-frontend`: mobile Flutter + web Next.js)
 
+> Documento único e completo: reúne a descrição técnica do **backend** e do **frontend** e, ao final, a **verificação dos requisitos** exigidos pela atividade acadêmica (MVVM, padrão adicional, integração com API e persistência local).
+
 ---
 
 ## 1. Visão geral do produto
@@ -159,13 +161,14 @@ Monorepo com dois apps que consomem os mesmos 7 serviços. Cada app mantém **7 
 
 ### 4.1 App Mobile (Flutter)
 
-**Stack:** Flutter 3 / Dart 3, **Riverpod** (estado), **go_router** (navegação), **dio** (HTTP), `flutter_secure_storage` (token cifrado), `fl_chart` (gráficos), `shimmer` (skeletons), `auth0_flutter` (OAuth opcional).
+**Stack:** Flutter 3 / Dart 3, **Riverpod** (estado), **go_router** (navegação), **dio** (HTTP), `flutter_secure_storage` (token cifrado), `shared_preferences` (cache de domínio), `fl_chart` (gráficos), `shimmer` (skeletons), `auth0_flutter` (OAuth opcional).
 
 **Arquitetura feature-first + camadas** (`data` → `domain` → `presentation`):
 
 ```
 lib/
-  core/      network (7 Dios + auth interceptor), router (shell), theme, di
+  core/      network (7 Dios + auth interceptor), router (shell),
+             theme, di, storage (LocalStorageService)
   features/  auth · games · datastores · snapshots · restore ·
              dashboard · audit · settings
   shared/    widgets reutilizáveis
@@ -187,6 +190,7 @@ lib/
 - Restore e comparação de snapshots passaram a usar **dados reais** do `snapshotsProvider` (antes mockados em Jan/2024).
 - Parsing defensivo no `DataStoreModel` (datas nulas não derrubam mais a lista inteira).
 - Planos: "Básico" (10 jogos, 5 GB, backups ilimitados até o teto, R$ 9,90/mês) e "Studio".
+- **Persistência local:** token JWT em `flutter_secure_storage` + cache de jogos/seleção em `shared_preferences`, com restauração de sessão no boot (ver §8.4).
 
 ### 4.2 App Web (Next.js)
 
@@ -253,6 +257,96 @@ src/app/
 - **Testes de integração:** a cobertura é unitária; faltam testes ponta-a-ponta com Docker.
 - **Endpoint de analytics:** retornava zeros e o mobile teve de agregar no cliente — vale consolidar no serviço.
 - **Paridade web:** Settings/Plano e visualização de DataStores ainda são só do mobile.
+
+---
+
+# Parte II — Verificação dos Requisitos (atividade acadêmica)
+
+> Esta parte avalia o **app mobile** (`apps/mobile`) contra a estrutura exigida pela atividade. Descreve o estado **real** do código e, ao final, aponta com transparência o que ainda pode evoluir.
+
+## 7. Introdução do aplicativo
+
+**Problema:** Desenvolvedores de jogos Roblox guardam dados de jogadores em **DataStores**, hoje gerenciados por consoles improvisados ou scripts soltos — sem backup confiável, sem histórico e sem forma segura de restaurar dados após corrupção ou exclusão acidental.
+
+**Solução:** **Phoenix** é um app de **gestão de dados como serviço (DMaaS)** para Roblox. Pelo aplicativo o desenvolvedor conecta um jogo (Universe ID + Open Cloud API Key), acompanha um **dashboard** de métricas, visualiza **snapshots** e seus DataStores, executa **restore** granular, agenda backups automáticos e gerencia plano/configurações. O app é o cliente do back-end de microsserviços descrito na Parte I, consumido via HTTP/REST.
+
+## 8. Atendimento aos requisitos
+
+### 8.1 Arquitetura MVVM
+
+Organização **feature-first em três camadas** (`data` / `domain` / `presentation`) que mapeia diretamente para os papéis do MVVM:
+
+| Papel MVVM | No código | Exemplo |
+|---|---|---|
+| **Model** | Modelos imutáveis + repositórios | `GameModel`, `SnapshotModel`, `GamesRepository` |
+| **ViewModel** | `StateNotifier`/providers que mantêm e expõem o estado, com a lógica de aplicação | `AuthNotifier` (`auth_provider.dart`), `GamesNotifier` (`games_provider.dart`) |
+| **View** | `ConsumerWidget`/`ConsumerStatefulWidget` que apenas observam e renderizam | `DashboardPage`, `GamesPage`, `RestoreWizardPage` |
+
+A View **não concentra regras de negócio**: carregamento, chamada ao repositório, cache e seleção padrão de jogo vivem no ViewModel (`GamesNotifier`); a View só decide *como desenhar* cada estado (`loading/error/data`).
+
+### 8.2 Padrão de projeto adicional: **Observer** (+ Singleton, Factory, Facade)
+
+- **Observer (principal):** reatividade do Riverpod. As Views se inscrevem (`ref.watch`) num ViewModel observável e são reconstruídas quando o estado muda. Quando `selectedGameProvider` muda, `snapshotsProvider` (que faz `ref.watch`) é reavaliado e todas as Views inscritas se atualizam — sem acoplamento entre telas.
+- **Singleton:** `ApiClient` instanciado uma única vez e compartilhado por todos os repositórios via `apiClientProvider`.
+- **Factory:** todos os models usam `factory fromJson(...)` para desserializar o JSON da API.
+- **Facade:** `LocalStorageService` abstrai `flutter_secure_storage` + `shared_preferences` atrás de uma interface única.
+
+### 8.3 Integração com API (loading / sucesso / erro)
+
+Cliente HTTP **Dio**, encapsulado no `ApiClient` (Singleton), com uma instância por serviço do back-end. Fluxo: `View → ViewModel → Repository → DataSource (Dio) → API`, retorno desserializado em Model via `fromJson`.
+
+| Estado | Representação | Na View |
+|---|---|---|
+| Carregamento | `AsyncLoading` / `isLoading` | skeleton (`shimmer`) ou spinner |
+| Sucesso | `AsyncData(...)` | renderiza os dados |
+| Erro | `try/catch` + `_parseError` | mensagem amigável (validação, timeout, rede) |
+
+Timeouts configurados no Dio (`connectTimeout` 10s, `receiveTimeout` 30s). Um interceptor detecta **401** (token inválido/expirado) e redireciona ao login.
+
+### 8.4 Persistência local (persistir + recuperar ao reabrir)
+
+Dois mecanismos complementares atrás do `LocalStorageService` (Facade):
+
+| Dado | Mecanismo | Por quê |
+|---|---|---|
+| Token JWT | `flutter_secure_storage` (cifrado) | Manter a sessão entre aberturas; credencial sensível |
+| Lista de jogos | `shared_preferences` | Exibir os jogos imediatamente no cold start, antes da API |
+| Id do jogo selecionado | `shared_preferences` | Reabrir o app já no último jogo escolhido |
+
+**Fluxo de recuperação no boot:**
+1. `main()` lê o token do `secure_storage`, decodifica o JWT (`UserModel.fromJwt`), reinjeta no `ApiClient` e monta um `AuthState` autenticado (via `bootstrapAuthStateProvider`). O roteador abre direto no dashboard, sem passar pelo login.
+2. O `GamesNotifier` carrega primeiro do cache (`_loadFromCache`) e exibe na hora; em paralelo, `load()` rebusca da API e atualiza o cache. Em falha de rede, o cache permanece em tela.
+3. A seleção de jogo é persistida sempre que muda e restaurada na próxima abertura.
+4. No **logout**, token e cache são apagados (`deleteToken` + `clearCache`).
+
+```dart
+final savedToken = await secureStorage.read(key: 'auth_token');
+if (savedToken != null && savedToken.isNotEmpty) {
+  final user = UserModel.fromJwt(savedToken);
+  if (user != null) {
+    apiClient.setAuthToken(savedToken);
+    bootstrapAuth = AuthState(isAuthenticated: true, user: user);
+  }
+}
+```
+
+## 9. Quadro-resumo de conformidade
+
+| Requisito obrigatório | Situação |
+|---|---|
+| Arquitetura MVVM | ✅ Atendido (data/domain/presentation + StateNotifier) |
+| Padrão adicional | ✅ Atendido (Observer + Singleton + Factory + Facade) |
+| Comunicação com API (loading/sucesso/erro) | ✅ Atendido |
+| Armazenamento local (persistir + recuperar ao reabrir) | ✅ Atendido (secure_storage p/ token + shared_preferences p/ cache, restaurados no boot) |
+| Escopo mínimo (2+ telas, fluxo, interação) | ✅ Atendido com folga |
+| README + Relatório técnico | ✅ README atualizado + este relatório |
+
+## 10. Limitações e melhorias futuras
+
+1. **MVVM mais estrito:** mover formatações residuais (tradução de eventos, "tempo atrás") das Views para os ViewModels e, opcionalmente, renomear `*Notifier → *ViewModel`.
+2. **Expiração de token:** a sessão restaurada confia no token salvo; falta validar expiração no boot (hoje um token expirado só é detectado na primeira chamada à API, que retorna 401 e leva ao login).
+3. **Testes:** o app ainda não possui testes de widget/unitários dos ViewModels.
+4. **Funções dependentes de back-end:** auto-cadastro, recuperação de senha e login Auth0 estão previstos na UI, mas dependem de endpoints ainda não disponíveis no servidor.
 
 ---
 
